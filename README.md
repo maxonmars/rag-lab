@@ -17,6 +17,8 @@ npm run dev -- rag index
 npm run dev -- rag compare
 ```
 
+Управление Ollama (включить, выключить, проверить, освободить память) — [docs/ollama.md](docs/ollama.md).
+
 `corpus:feod` клонирует feod-docs в `.local/rag/source`, переключает на закреплённый коммит и собирает 32 документа в
 `.local/rag/corpus`. Ollama должна быть запущена (`ollama serve`); `rag index` печатает ход по стратегиям в stderr.
 Результаты — `.local/rag/index.json` и `.local/rag/comparison.md` (каталог `.local/` не попадает в git).
