@@ -25,6 +25,9 @@ npm run dev -- rag compare
 
 Полный отчёт с тремя разобранными участками — [comparison.md](comparison.md), копия `.local/rag/comparison.md`.
 
+Фрагменты документации FEOD в этом отчёте и в `comparison.md` — Copyright (c) 2026 FEOD Architecture, лицензия MIT
+([LICENSE](https://github.com/feod-architecture/feod-docs/blob/f00eaf533cfee37f67e118c96291d535b0895a6f/LICENSE)).
+
 ## Измерения
 
 ### Корпус
