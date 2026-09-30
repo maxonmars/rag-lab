@@ -23,12 +23,19 @@ it("команды имеют уникальные имена и алиасы, �
     config: () => [],
     ragIndex: async () => ({ lines: [], path: "" }),
     ragCompare: async () => ({ lines: [], path: "" }),
+    ragAsk: async () => ({ answer: "", fragments: [] }),
+    ragMode: () => false,
+    setRagMode: () => [],
+    ragEval: async () => ({ lines: [], path: "" }),
     view: {
       answer: () => {},
       help: () => {},
       config: () => {},
       indexBuilt: () => {},
       comparisonSaved: () => {},
+      ragAnswer: () => {},
+      ragMode: () => {},
+      evalSaved: () => {},
     },
   });
   const names = commands.flatMap((command) => [command.name, ...(command.aliases ?? [])]);

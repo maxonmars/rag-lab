@@ -14,10 +14,13 @@ YAML содержит плоские ключи с точками. Секрет�
 | llm.maxOutputTokens | number | 1024 | LAB_LLM_MAX_OUTPUT_TOKENS | --llm-max-output-tokens | Максимальное число токенов ответа. |
 | llm.apiKey | string | — | LAB_LLM_API_KEY | — | Ключ DeepSeek; принимается только из env, значение никогда не выводится. |
 | rag.inputDir | string | .local/rag/corpus | LAB_RAG_INPUT_DIR | --rag-input-dir | Каталог Markdown-корпуса относительно текущего рабочего каталога; готовится командой `npm run corpus:feod`. |
-| rag.outputDir | string | .local/rag | LAB_RAG_OUTPUT_DIR | --rag-output-dir | Каталог результатов относительно текущего рабочего каталога: `index.json` и `comparison.md`. |
+| rag.outputDir | string | .local/rag | LAB_RAG_OUTPUT_DIR | --rag-output-dir | Каталог результатов относительно текущего рабочего каталога: `index.json`, `comparison.md` и `rag-eval.md`. |
 | rag.chunkSizeChars | number | 1800 | LAB_RAG_CHUNK_SIZE_CHARS | --rag-chunk-size-chars | Максимальный размер чанка и окна fixed в кодовых точках Unicode. |
 | rag.overlapChars | number | 200 | LAB_RAG_OVERLAP_CHARS | --rag-overlap-chars | Перекрытие соседних окон fixed и предел перекрытия из целых блоков в structure; строго меньше размера чанка. |
 | rag.minChunkChars | number | 500 | LAB_RAG_MIN_CHUNK_CHARS | --rag-min-chunk-chars | Размер, ниже которого чанк structure объединяется с соседним, если вместе они не длиннее максимального; не больше размера чанка. |
 | rag.embeddingBaseUrl | string | http://localhost:11434 | LAB_RAG_EMBEDDING_BASE_URL | --rag-embedding-base-url | Адрес сервера Ollama. |
 | rag.embeddingModel | string | bge-m3 | LAB_RAG_EMBEDDING_MODEL | --rag-embedding-model | Имя модели эмбеддингов в Ollama; модель скачивается командой `ollama pull`. |
 | rag.embeddingTimeoutMs | number | 120000 | LAB_RAG_EMBEDDING_TIMEOUT_MS | --rag-embedding-timeout-ms | Таймаут одного запроса эмбеддингов к Ollama, миллисекунды. |
+| rag.chunkStrategy | string | structure | LAB_RAG_CHUNK_STRATEGY | --rag-chunk-strategy | Стратегия чанкинга, по чанкам которой ищут `rag ask`, режим `/rag on` и `rag eval`; индекс содержит обе: `fixed` и `structure`. |
+| rag.topK | number | 5 | LAB_RAG_TOP_K | --rag-top-k | Сколько найденных чанков передаётся модели в режиме RAG, от 1 до 20. |
+| rag.questionsFile | string | experiments/feod-rag/questions.md | LAB_RAG_QUESTIONS_FILE | --rag-questions-file | Markdown-файл контрольных вопросов для `rag eval` относительно текущего рабочего каталога. |

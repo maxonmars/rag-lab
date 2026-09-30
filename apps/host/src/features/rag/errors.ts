@@ -11,7 +11,10 @@ export type RagErrorCode =
   | "INVALID_EMBEDDINGS"
   | "INDEX_NOT_FOUND"
   | "INDEX_INVALID"
-  | "INDEX_WRITE_FAILED";
+  | "INDEX_WRITE_FAILED"
+  | "INDEX_MODEL_MISMATCH"
+  | "QUESTIONS_NOT_FOUND"
+  | "QUESTIONS_INVALID";
 
 export class RagError extends Error {
   readonly code: RagErrorCode;
@@ -32,6 +35,21 @@ const invalidEmbeddings: Record<string, string> = {
   dimension: "размерность вектора меняется",
   format: "неожиданный формат ответа",
 };
+
+const invalidQuestions: Record<string, string> = {
+  empty: "нет ни одного раздела «## qNN. Вопрос»",
+  heading: "заголовок раздела должен иметь вид «## qNN. Вопрос»",
+  expectation: "нет строки «Ожидание:»",
+  sources: "нет строки «Источники:»",
+  duplicate: "идентификатор повторяется",
+  source: "источник не найден в индексе",
+};
+
+function describeInvalidQuestions(data: RagError["data"]): string {
+  const reason = invalidQuestions[String(data.reason)] ?? "неизвестная причина";
+  const where = [data.id, data.file].filter((part) => part !== undefined).join(", ");
+  return `Некорректный файл контрольных вопросов: ${reason}${where ? ` (${where})` : ""}.`;
+}
 
 export function describeRagError(error: RagError): string {
   const { data } = error;
@@ -64,5 +82,11 @@ export function describeRagError(error: RagError): string {
       return "Файл индекса повреждён или создан другой версией формата. Пересоберите: rag index.";
     case "INDEX_WRITE_FAILED":
       return "Не удалось сохранить файл.";
+    case "INDEX_MODEL_MISMATCH":
+      return `Индекс построен моделью ${data.indexModel}, а для запроса выбрана ${data.model}. Пересоберите индекс: rag index.`;
+    case "QUESTIONS_NOT_FOUND":
+      return "Файл контрольных вопросов не найден. Проверьте rag.questionsFile.";
+    case "QUESTIONS_INVALID":
+      return describeInvalidQuestions(data);
   }
 }

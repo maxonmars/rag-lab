@@ -1,3 +1,4 @@
+import { fence, integer, tableCell } from "./format.ts";
 import { type FragmentView, fragmentViews } from "./fragments.ts";
 import type { IndexFile } from "./indexFile.ts";
 import { BLOCK_KINDS, type CorpusMetrics, type StrategyMetrics } from "./metrics.ts";
@@ -10,20 +11,7 @@ export type ReportData = Readonly<{
   strategies: Readonly<Record<Strategy, StrategyMetrics>>;
 }>;
 
-const integer = (value: number): string =>
-  Math.round(value)
-    .toString()
-    .replace(/\B(?=(\d{3})+(?!\d))/g, " ");
 const percent = (value: number): string => `${(value * 100).toFixed(1)}%`;
-
-function fence(text: string): string {
-  const longest = Math.max(2, ...[...text.matchAll(/`+/g)].map((match) => match[0].length));
-  return "`".repeat(longest + 1);
-}
-
-function quote(text: string): string {
-  return text.replaceAll("\n", "⏎").replaceAll("|", "\\|");
-}
 
 function row(label: string, fixed: string, structure: string): string {
   return `| ${label} | ${fixed} | ${structure} |`;
@@ -80,7 +68,7 @@ function fragmentSection(view: FragmentView, number: number): string[] {
     );
     for (const chunk of chunks) {
       lines.push(
-        `| \`${chunk.chunkId}\` | ${chunk.start}–${chunk.end} | ${percent(chunk.covered)} | ${quote(chunk.head)} | ${quote(chunk.tail)} |`,
+        `| \`${chunk.chunkId}\` | ${chunk.start}–${chunk.end} | ${percent(chunk.covered)} | ${tableCell(chunk.head)} | ${tableCell(chunk.tail)} |`,
       );
     }
     lines.push("");

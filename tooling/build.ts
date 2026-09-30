@@ -28,7 +28,7 @@ try {
     env: {},
     stdio: "pipe",
   });
-  for (const name of ["rag index", "rag compare"]) {
+  for (const name of ["rag index", "rag compare", "rag ask", "rag eval"]) {
     if (!help.includes(name)) throw new Error(`В собранной справке отсутствует ${name}.`);
   }
   execFileSync(process.execPath, [main, "config", "show"], { cwd: temporary, env: {}, stdio: "pipe" });

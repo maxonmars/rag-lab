@@ -3,9 +3,11 @@
 ## Цель и текущий объём
 Учебный репозиторий пятой недели курса — RAG. Каркас взят из mcp-lab: ядро (Agent, ModelPort), адаптер DeepSeek,
 CLI, реестры настроек и команд, tooling. MCP-фичи и серверы не переносились (ADR 0001).
-Сейчас реализована индексация документов (ADR 0002): корпус Markdown → чанки двумя стратегиями (fixed и structure)
+Реализована индексация документов (ADR 0002): корпус Markdown → чанки двумя стратегиями (fixed и structure)
 → локальные эмбеддинги Ollama → `index.json` с метаданными → отчёт сравнения стратегий (`rag index`, `rag compare`).
-Поиска по индексу, ответов с RAG, реранкинга, цитат, памяти и истории нет. Задания выдаются по одному;
+И первый RAG-запрос (ADR 0003): вопрос → top-K чанков одной стратегии чанкинга (линейный косинус) → Markdown-сообщение
+→ DeepSeek; `rag ask`, режим сессии `/rag on|off`, контрольные вопросы и `rag eval`.
+Реранкинга, порога релевантности, цитат, памяти и истории нет. Задания выдаются по одному;
 docs/course.md — ориентир недели, он не разрешает реализовывать будущие задания заранее.
 Перед заданием сформулируй учебную цель и минимальный результат; улучшения отдели явно.
 
@@ -16,8 +18,8 @@ docs/course.md — ориентир недели, он не разрешает �
 | apps/host/src/adapters/llm | DeepSeek через OpenAI-совместимый SDK |
 | apps/host/src/adapters/cli | Ввод, dispatch, REPL, отображение ошибок |
 | apps/host/src/app | Единственная композиция host, реестры, Markdown-инструкции |
-| apps/host/src/features/rag | Индексация: корпус, чанкинг, эмбеддинги Ollama, индекс, сравнение |
-| experiments | Отчёты сравнений: фиксированные вопросы, измерения, выводы |
+| apps/host/src/features/rag | Индексация и RAG-запрос: корпус, чанкинг, эмбеддинги Ollama, индекс, сравнение, поиск, ответ, контрольные вопросы |
+| experiments | Отчёты сравнений и контрольные вопросы: измерения, ручные оценки, выводы |
 | docs/adr, docs/demos | Решения и короткие ручные демонстрации |
 | tooling | Архитектурные проверки, документация, сборка, подготовка корпуса |
 
@@ -37,6 +39,9 @@ core не импортирует SDK, Node API, адаптеры, app или ф�
 - Стратегия чанкинга: fixed — окна с перекрытием; structure — по заголовкам и целым блокам Markdown.
 - Индекс: `index.json` с документами, чанками обеих стратегий, эмбеддингами и параметрами построения.
 - Эмбеддинг: вектор чанка от модели Ollama; EmbeddingPort — порт фичи rag, не ModelPort.
+- Режим RAG: режим сессии REPL (`/rag on`, `/rag off`, старт — выключен); `rag ask` всегда отвечает с RAG.
+- Контрольный вопрос: раздел `experiments/feod-rag/questions.md` с ожиданием и файлами-источниками корпуса.
+- top-K: число ближайших чанков, которые получает модель (`rag.topK`); стратегия поиска — `rag.chunkStrategy`.
 - Agent: объект, обрабатывающий реплику через ModelPort. Command — команда CLI/REPL.
 - Не называй разные понятия просто strategy: в коде и документах это только стратегия чанкинга.
 
@@ -52,7 +57,7 @@ process.env и process.argv читаются только в app/main.ts; дал
 ## Markdown и структура
 Инструкции модели, заметки, отчёты — Markdown; метаданные — YAML frontmatter.
 Структура допустима для API, схем, YAML-настроек и машинного состояния (`index.json`).
-Не собирай смысловой контекст через JSON.stringify. Текущий system prompt — app/system.md.
+Не собирай смысловой контекст через JSON.stringify. System prompt — app/system.md, инструкция режима RAG — features/rag/prompts/answer.md.
 Запись файла: временный рядом + rename. Это не межфайловая транзакция. Не добавляй хранилища и миграции без задания.
 Корпус и результаты лежат в `.local/` (вне git); воспроизводимые таблицы и выводы — в experiments/.
 
@@ -81,6 +86,7 @@ dependency-cruiser проверяет границы, циклы и import type.
 ## Команды разработки
 Node 24; npm ci; npm run hooks:install; npm run dev; npm run dev -- help.
 npm run corpus:feod; npm run dev -- rag index; npm run dev -- rag compare.
+npm run dev -- rag ask "вопрос"; npm run dev -- rag eval; в REPL — /rag on и /rag off.
 npm run lint; npm run typecheck; npm test; npm run test:coverage; npm run build.
 npm run check; npm run check:deps; npm run check:structure; npm run docs:generate.
 

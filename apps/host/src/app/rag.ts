@@ -1,17 +1,7 @@
-import { join, resolve } from "node:path";
 import type { CliView } from "../adapters/cli/index.ts";
-import {
-  type CompareResult,
-  compareIndex,
-  createOllamaEmbeddings,
-  type EmbeddingPort,
-  type IndexResult,
-  indexCorpus,
-  type OllamaOptions,
-} from "../features/rag/index.ts";
+import { type CompareResult, compareIndex, type IndexResult, indexCorpus } from "../features/rag/index.ts";
 import type { ResolvedConfig } from "./config.ts";
-
-export type CreateEmbeddings = (options: OllamaOptions) => EmbeddingPort;
+import { type CreateEmbeddings, configuredEmbeddings, ragPaths } from "./embeddings.ts";
 
 export type RagHandlerOptions = Readonly<{
   cwd: string;
@@ -49,28 +39,20 @@ function compareLines(result: CompareResult): string[] {
 }
 
 export function createRagHandlers(options: RagHandlerOptions) {
-  const files = () => {
-    const values = options.getConfig().values;
-    const outputDir = resolve(options.cwd, values["rag.outputDir"]);
-    return { values, indexFile: join(outputDir, "index.json"), reportFile: join(outputDir, "comparison.md") };
-  };
   return {
     async index(): Promise<RagOutcome> {
-      const { values, indexFile } = files();
-      const createEmbeddings = options.createEmbeddings ?? createOllamaEmbeddings;
+      const config = options.getConfig();
+      const { values } = config;
+      const paths = ragPaths(options.cwd, config);
       const result = await indexCorpus({
-        inputDir: resolve(options.cwd, values["rag.inputDir"]),
-        outputFile: indexFile,
+        inputDir: paths.inputDir,
+        outputFile: paths.indexFile,
         params: {
           chunkSizeChars: values["rag.chunkSizeChars"],
           overlapChars: values["rag.overlapChars"],
           minChunkChars: values["rag.minChunkChars"],
         },
-        embeddings: createEmbeddings({
-          baseUrl: values["rag.embeddingBaseUrl"],
-          model: values["rag.embeddingModel"],
-          timeoutMs: values["rag.embeddingTimeoutMs"],
-        }),
+        embeddings: configuredEmbeddings(config, options.createEmbeddings),
         onProgress: (event) =>
           options.view.progress(
             `${event.strategy}: ${event.stage === "chunked" ? "разбиение" : "эмбеддинги"}, чанков ${event.chunks}`,
@@ -79,7 +61,7 @@ export function createRagHandlers(options: RagHandlerOptions) {
       return { lines: indexLines(result), path: result.path };
     },
     async compare(): Promise<RagOutcome> {
-      const { indexFile, reportFile } = files();
+      const { indexFile, reportFile } = ragPaths(options.cwd, options.getConfig());
       const result = await compareIndex({ indexFile, reportFile });
       return { lines: compareLines(result), path: result.path };
     },

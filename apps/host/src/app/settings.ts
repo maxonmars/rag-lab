@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { STRATEGIES } from "../features/rag/index.ts";
 import { sections } from "./markdown.ts";
 
 const descriptions = sections(new URL("./settings.md", import.meta.url));
 const positiveInteger = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
+const MAX_TOP_K = 20;
 
 export const settings = {
   "config.file": { schema: z.string().trim().min(1), default: "lab.config.yaml", type: "string", file: false },
@@ -18,6 +20,13 @@ export const settings = {
   "rag.embeddingBaseUrl": { schema: z.url(), default: "http://localhost:11434", type: "string" },
   "rag.embeddingModel": { schema: z.string().trim().min(1), default: "bge-m3", type: "string" },
   "rag.embeddingTimeoutMs": { schema: positiveInteger, default: 120000, type: "number" },
+  "rag.chunkStrategy": { schema: z.enum(STRATEGIES), default: "structure", type: "string" },
+  "rag.topK": { schema: z.number().int().min(1).max(MAX_TOP_K), default: 5, type: "number" },
+  "rag.questionsFile": {
+    schema: z.string().trim().min(1),
+    default: "experiments/feod-rag/questions.md",
+    type: "string",
+  },
 } as const;
 
 export type SettingKey = keyof typeof settings;

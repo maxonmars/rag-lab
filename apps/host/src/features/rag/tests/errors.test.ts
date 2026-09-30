@@ -18,6 +18,19 @@ const CASES: readonly [RagErrorCode, Record<string, string | number>, string][] 
   ["INDEX_NOT_FOUND", {}, "rag index"],
   ["INDEX_INVALID", {}, "Пересоберите"],
   ["INDEX_WRITE_FAILED", {}, "Не удалось сохранить"],
+  [
+    "INDEX_MODEL_MISMATCH",
+    { indexModel: "bge-m3:latest", model: "nomic-embed-text:latest" },
+    "Индекс построен моделью bge-m3:latest, а для запроса выбрана nomic-embed-text:latest. Пересоберите индекс: rag index.",
+  ],
+  ["QUESTIONS_NOT_FOUND", {}, "Проверьте rag.questionsFile"],
+  ["QUESTIONS_INVALID", { reason: "empty" }, "нет ни одного раздела «## qNN. Вопрос»."],
+  ["QUESTIONS_INVALID", { reason: "heading", id: "q01" }, "заголовок раздела должен иметь вид «## qNN. Вопрос» (q01)."],
+  ["QUESTIONS_INVALID", { reason: "expectation", id: "q02" }, "нет строки «Ожидание:» (q02)."],
+  ["QUESTIONS_INVALID", { reason: "sources", id: "q03" }, "нет строки «Источники:» (q03)."],
+  ["QUESTIONS_INVALID", { reason: "duplicate", id: "q04" }, "идентификатор повторяется (q04)."],
+  ["QUESTIONS_INVALID", { reason: "source", id: "q05", file: "a.md" }, "источник не найден в индексе (q05, a.md)."],
+  ["QUESTIONS_INVALID", { reason: "other" }, "неизвестная причина."],
 ];
 
 it.each(CASES)("%s %j → сообщение называет причину и следующий шаг", (code, data, expected) => {
