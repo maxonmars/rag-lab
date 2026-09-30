@@ -6,7 +6,10 @@ import { wrapText } from "./text.ts";
 
 export type HelpSetting = Readonly<{ flag: string; type: string; description: string }>;
 export type ConfigRow = Readonly<{ key: string; value: string; source: string }>;
-export type CommandView = Pick<CliView, "answer" | "help" | "config" | "indexBuilt" | "comparisonSaved">;
+export type CommandView = Pick<
+  CliView,
+  "answer" | "help" | "config" | "indexBuilt" | "comparisonSaved" | "ragAnswer" | "ragMode" | "evalSaved"
+>;
 
 const fallbackWidth = 88;
 const columnGap = "  ";
@@ -26,6 +29,17 @@ export class CliView {
 
   answer(text: string): void {
     this.#block("Ответ агента", [text]);
+  }
+
+  /** Ответ с RAG: текст модели и под ним найденные фрагменты, чтобы режимы различались на экране. */
+  ragAnswer(text: string, fragments: readonly string[]): void {
+    const label = this.#paint("key", "Фрагменты:");
+    const listed = fragments.length > 0 ? [label, ...fragments.map((line) => `  ${line}`)] : [`${label} не найдены`];
+    this.#block("Ответ агента · RAG", [text, "", ...listed]);
+  }
+
+  ragMode(lines: readonly string[]): void {
+    this.#block("Режим", lines);
   }
 
   help(commands: readonly Command[], settings: readonly HelpSetting[]): void {
@@ -71,6 +85,10 @@ export class CliView {
 
   comparisonSaved(lines: readonly string[], path: string): void {
     this.#block("Сравнение стратегий", [...lines, "", this.#paint("muted", `Сохранено: ${path}`)]);
+  }
+
+  evalSaved(lines: readonly string[], path: string): void {
+    this.#block("Контрольные вопросы", [...lines, "", this.#paint("muted", `Сохранено: ${path}`)]);
   }
 
   /** Служебная строка хода длинной операции; пишется в stderr, чтобы не смешиваться с результатом. */

@@ -63,7 +63,9 @@ describe("CLI и REPL", () => {
   it("интерактивный REPL показывает заголовок один раз и приглашение перед каждым вводом", async () => {
     const result = await invoke([], { cwd, input: "Вопрос\n/exit\n", interactive: true });
     expect(result.output.match(/── rag-lab ──/g)).toHaveLength(1);
-    expect(result.output).toContain("/ask · /help · /config show · /rag index · /rag compare · /exit");
+    expect(result.output).toContain(
+      "/ask · /help · /config show · /rag index · /rag compare · /rag ask · /rag on · /rag off · /rag eval · /exit",
+    );
     expect(result.output.match(/rag-lab > /g)).toHaveLength(2);
   });
 

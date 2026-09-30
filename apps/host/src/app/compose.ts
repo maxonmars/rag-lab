@@ -4,7 +4,9 @@ import type { ModelPort } from "../core/index.ts";
 import { createAskHandler } from "./ask.ts";
 import { createCommands } from "./commands.ts";
 import { parseOptions, type ResolvedConfig, resolveConfig, showConfig } from "./config.ts";
-import { type CreateEmbeddings, createRagHandlers } from "./rag.ts";
+import type { CreateEmbeddings } from "./embeddings.ts";
+import { createRagHandlers } from "./rag.ts";
+import { createRagAnswerHandlers, modeLines } from "./ragAnswer.ts";
 
 export type RunOptions = Readonly<{
   argv: readonly string[];
@@ -20,12 +22,22 @@ export async function run(options: RunOptions): Promise<number> {
   const view = new CliView(options.terminal.output, options.terminal.error);
   const getConfig = () => config;
   const createModel = options.createModel ?? ((settings: DeepSeekOptions) => new DeepSeekModel(settings));
-  const rag = createRagHandlers({ cwd: options.cwd, getConfig, view, createEmbeddings: options.createEmbeddings });
+  const { cwd, createEmbeddings } = options;
+  const rag = createRagHandlers({ cwd, getConfig, view, createEmbeddings });
+  const ragAnswer = createRagAnswerHandlers({ cwd, getConfig, createModel, createEmbeddings, view });
+  let ragMode = false;
   const commands = createCommands({
     ask: createAskHandler({ createModel, getConfig }),
     config: () => showConfig(config),
     ragIndex: rag.index,
     ragCompare: rag.compare,
+    ragAsk: ragAnswer.ask,
+    ragMode: () => ragMode,
+    setRagMode: (enabled) => {
+      ragMode = enabled;
+      return modeLines(enabled, config);
+    },
+    ragEval: ragAnswer.evaluate,
     view,
   });
   let command: string[];

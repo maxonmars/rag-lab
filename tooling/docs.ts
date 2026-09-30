@@ -9,6 +9,9 @@ const silentView = {
   config: () => {},
   indexBuilt: () => {},
   comparisonSaved: () => {},
+  ragAnswer: () => {},
+  ragMode: () => {},
+  evalSaved: () => {},
 };
 
 export function generatedDocs(): Record<string, string> {
@@ -21,6 +24,10 @@ export function generatedDocs(): Record<string, string> {
     config: () => [],
     ragIndex: async () => ({ lines: [], path: "" }),
     ragCompare: async () => ({ lines: [], path: "" }),
+    ragAsk: async () => ({ answer: "", fragments: [] }),
+    ragMode: () => false,
+    setRagMode: () => [],
+    ragEval: async () => ({ lines: [], path: "" }),
     view: silentView,
   });
   const commands = registry.map(

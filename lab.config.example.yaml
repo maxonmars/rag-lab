@@ -9,3 +9,6 @@ rag.minChunkChars: 500
 rag.embeddingBaseUrl: http://localhost:11434
 rag.embeddingModel: bge-m3
 rag.embeddingTimeoutMs: 120000
+rag.chunkStrategy: structure
+rag.topK: 5
+rag.questionsFile: experiments/feod-rag/questions.md

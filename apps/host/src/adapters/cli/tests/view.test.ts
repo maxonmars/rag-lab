@@ -36,6 +36,8 @@ function renderAll(view: CliView): void {
   view.help(commands, [{ flag: "--llm-model", type: "string", description: "Модель." }]);
   view.config([{ key: "llm.apiKey", value: "[задано]", source: "env" }]);
   view.indexBuilt(["fixed: 2 чанка"], "/data/index.json");
+  view.ragAnswer("Ответ по документам", ["1. a.md › Раздел · 0.71"]);
+  view.ragMode(["Ответы без RAG."]);
   view.error(new AgentError("EMPTY_RESPONSE"));
 }
 
@@ -97,6 +99,17 @@ it("оформляет справку, настройки и ответ по в�
       "",
       "Сохранено: /data/index.json",
       "",
+      "── Ответ агента · RAG ──",
+      "",
+      "Ответ по документам",
+      "",
+      "Фрагменты:",
+      "  1. a.md › Раздел · 0.71",
+      "",
+      "── Режим ──",
+      "",
+      "Ответы без RAG.",
+      "",
     ].join("\n"),
   );
 });
@@ -116,4 +129,15 @@ it("сравнение и ход операции: итог — в stdout, хо�
   view.warning("Что-то пошло не так.");
   expect(output.text).toBe("\n── Сравнение стратегий ──\n\nfixed: 1 чанк\n\nСохранено: /data/comparison.md\n");
   expect(error.text).toBe("fixed: разбиение, чанков 1\nПредупреждение · Что-то пошло не так.\n");
+});
+
+it("ответ с RAG без фрагментов и итог rag eval", () => {
+  const output = capture();
+  const view = new CliView(output, capture());
+  view.ragAnswer("Ответ", []);
+  view.evalSaved(["Вопросов: 10"], "/data/rag-eval.md");
+  expect(output.text).toBe(
+    "\n── Ответ агента · RAG ──\n\nОтвет\n\nФрагменты: не найдены\n" +
+      "\n── Контрольные вопросы ──\n\nВопросов: 10\n\nСохранено: /data/rag-eval.md\n",
+  );
 });

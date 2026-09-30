@@ -3,7 +3,9 @@
 Учебный репозиторий пятой недели курса — RAG. Первое задание — индексация документов: русскоязычная документация
 FEOD (32 файла, около 174 тыс. символов) режется на чанки двумя стратегиями, для чанков считаются эмбеддинги в
 локальной Ollama, результат сохраняется в `index.json` вместе с метаданными, а `rag compare` сравнивает стратегии.
-Поиск, ответы с RAG и реранкинг появятся в следующих заданиях. Каркас взят из mcp-lab ([ADR 0001](docs/adr/0001-repository-foundation.md)).
+Второе задание — первый RAG-запрос: по вопросу ищутся ближайшие чанки, они склеиваются с вопросом и уходят в
+DeepSeek; ответы без RAG и с RAG сравниваются на 10 контрольных вопросах. Реранкинг, цитаты и режим «не знаю»
+появятся в следующих заданиях. Каркас взят из mcp-lab ([ADR 0001](docs/adr/0001-repository-foundation.md)).
 
 ## Запуск
 
@@ -22,7 +24,7 @@ npm run dev -- rag compare
 `corpus:feod` клонирует feod-docs в `.local/rag/source`, переключает на закреплённый коммит и собирает 32 документа в
 `.local/rag/corpus`. Ollama должна быть запущена (`ollama serve`); `rag index` печатает ход по стратегиям в stderr.
 Результаты — `.local/rag/index.json` и `.local/rag/comparison.md` (каталог `.local/` не попадает в git).
-Ключ DeepSeek нужен только для `ask`: `LAB_LLM_API_KEY` в корневом `.env` или окружении процесса.
+Ключ DeepSeek нужен для `ask`, `rag ask` и `rag eval`: `LAB_LLM_API_KEY` в корневом `.env` или окружении процесса.
 
 ```sh
 npm run dev -- help
@@ -31,14 +33,31 @@ npm run dev -- --rag-chunk-size-chars=1200 --rag-min-chunk-chars=300 rag index
 npm run dev -- ask "Что такое чанкинг?"
 ```
 
+## Ответы с RAG
+
+Нужны индекс (`rag index`), запущенная Ollama с той же моделью и ключ DeepSeek. `rag ask` всегда отвечает по найденным
+фрагментам и печатает их под ответом; в REPL `/rag on` включает режим для обычных строк и `/ask`, `/rag off` выключает
+(старт — без RAG). `rag eval` прогоняет контрольные вопросы в обоих режимах и пишет `.local/rag/rag-eval.md`.
+
+```sh
+npm run dev -- rag ask "Что можно хранить в global?"
+npm run dev -- rag eval
+npm run dev
+```
+
+В REPL: `/rag on`, вопрос, `/rag off`, тот же вопрос. Поиск идёт по чанкам `rag.chunkStrategy` (`structure`), в модель
+уходят `rag.topK` фрагментов (5).
+
 Настройки — YAML-файл, env (`LAB_RAG_…`) и флаги; приоритет и список — [docs/configuration.md](docs/configuration.md),
 команды — [docs/commands.md](docs/commands.md). Пример файла — [lab.config.example.yaml](lab.config.example.yaml).
 
 ## Материалы
 
 - [ADR 0002](docs/adr/0002-document-indexing.md) — решения индексации и выбор модели эмбеддингов.
+- [ADR 0003](docs/adr/0003-first-rag-query.md) — поиск, режим RAG, контрольные вопросы.
 - [Фича rag](apps/host/src/features/rag/README.md) — контракт, формат индекса, ограничения.
-- [Демо](docs/demos/indexing.md) и [эксперимент](experiments/feod-chunking/README.md) — воспроизведение и выводы.
+- Демо [индексации](docs/demos/indexing.md) и [RAG-запроса](docs/demos/rag-query.md), эксперименты
+  [feod-chunking](experiments/feod-chunking/README.md) и [feod-rag](experiments/feod-rag/README.md) — воспроизведение и выводы.
 - [Архитектура](ARCHITECTURE.md), [курс](docs/course.md), [правила для агентов](AGENTS.md).
 
 ## Проверки
