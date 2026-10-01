@@ -1,113 +1,100 @@
-import { integer, tableCell } from "./format.ts";
-import type { ControlQuestion } from "./questions.ts";
-import type { SearchHit, SearchIndex } from "./search.ts";
+import type { ModeMetrics, QuestionResult } from "./evalMetrics.ts";
+import { questionSection } from "./evalSections.ts";
+import { filesList, integer, seconds } from "./format.ts";
+import { foundSources } from "./questions.ts";
+import { RETRIEVAL_MODES, type RetrievalMode, type RetrievalParams } from "./retrieval.ts";
+import type { SearchIndex } from "./search.ts";
 import type { Strategy } from "./types.ts";
-
-export type QuestionResult = Readonly<{
-  question: ControlQuestion;
-  hits: readonly SearchHit[];
-  found: readonly string[];
-  firstRank: number | null;
-  contextChars: number;
-  plainAnswer: string;
-  ragAnswer: string;
-  plainMs: number;
-  ragMs: number;
-}>;
 
 export type EvalReportData = Readonly<{
   now: Date;
   index: SearchIndex;
   strategy: Strategy;
-  topK: number;
+  params: RetrievalParams;
   questionsFile: string;
   llmModel: string;
+  wallMs: number;
   results: readonly QuestionResult[];
+  metrics: Readonly<Record<RetrievalMode, ModeMetrics>>;
 }>;
 
-const seconds = (ms: number): string => (ms / 1000).toFixed(1);
-const files = (sources: readonly string[]): string =>
-  sources.length > 0 ? sources.map((s) => `\`${s}\``).join(", ") : "—";
-
-function quoteBlock(text: string): string[] {
-  return text
-    .replaceAll("\r\n", "\n")
-    .split("\n")
-    .map((line) => (line ? `> ${line}` : ">"));
-}
+const fixed = (value: number | null, digits = 2): string => (value === null ? "—" : value.toFixed(digits));
+const share = (part: number, whole: number): string =>
+  whole === 0 ? "—" : `${part} из ${whole} (${(part / whole).toFixed(2)})`;
 
 function header(data: EvalReportData): string[] {
-  const { index } = data;
+  const { index, params } = data;
   return [
-    "# Контрольные вопросы: ответы без RAG и с RAG",
+    "# Сравнение режимов поиска: baseline, filter, rewrite, rewrite-filter",
     "",
-    `Прогон ${data.now.toISOString()}. Вопросы: \`${data.questionsFile}\` (${data.results.length}).`,
+    `Прогон ${data.now.toISOString()}. Вопросы: \`${data.questionsFile}\` (${data.results.length}). Фактическая длительность прогона: ${seconds(data.wallMs)} с.`,
     `Индекс создан ${index.createdAt}, модель эмбеддингов \`${index.model.name}\` (digest ${index.model.digest.slice(0, 12)}).`,
-    `Модель ответов: \`${data.llmModel}\`. Поиск: стратегия ${data.strategy}, top-${data.topK}, косинусная близость, линейный перебор.`,
+    `Модель ответов и переписывания запроса: \`${data.llmModel}\`. Поиск: стратегия ${data.strategy}, косинусная близость, линейный перебор; кандидатов ${params.candidateTopK}, итоговый top-${params.topK}, порог ${params.threshold} (используется в filter и rewrite-filter).`,
     "",
   ];
 }
 
-function summaryRow(result: QuestionResult): string {
-  const expected = result.question.sources.length;
-  const found = expected > 0 ? `${result.found.length} из ${expected}` : "—";
-  const rank = result.firstRank === null ? "—" : String(result.firstRank);
-  const cells = [result.question.id, found, rank, integer(result.contextChars)];
-  return `| ${[...cells, seconds(result.plainMs), seconds(result.ragMs)].join(" | ")} |`;
+function modeRow(mode: RetrievalMode, metrics: ModeMetrics): string {
+  const cells = [
+    mode,
+    share(metrics.hitQuestions, metrics.positives),
+    fixed(metrics.mrr, 3),
+    share(metrics.foundPairs, metrics.expectedPairs),
+    share(metrics.nonEmptyNegatives, metrics.negatives),
+    fixed(metrics.meanHits, 1),
+    integer(metrics.meanContextChars),
+    seconds(metrics.totalMs),
+  ];
+  return `| ${cells.join(" | ")} |`;
 }
 
-function summary(data: EvalReportData): string[] {
-  const expected = data.results.reduce((sum, result) => sum + result.question.sources.length, 0);
-  const found = data.results.reduce((sum, result) => sum + result.found.length, 0);
+function modeSummary(data: EvalReportData): string[] {
+  const topK = data.params.topK;
   return [
-    "## Сводка",
+    "## Сводка режимов",
     "",
-    "| Вопрос | Ожидаемые источники в top-K | Ранг первого | Контекст, символов | Без RAG, с | С RAG, с |",
-    "|---|---|---|---|---|---|",
-    ...data.results.map(summaryRow),
+    `| Режим | hit@${topK} | MRR | Покрытие источников | Отрицательные с непустым контекстом | Чанков в среднем | Сообщение, символов в среднем | Время этапов, с |`,
+    "|---|---|---|---|---|---|---|---|",
+    ...RETRIEVAL_MODES.map((mode) => modeRow(mode, data.metrics[mode])),
     "",
-    `Найдено ожидаемых источников: ${found} из ${expected}.`,
-    "",
-    "Измерено: время ответа (один прогон). Вычислено: сходство, ранги, попадание ожидаемых файлов в top-K.",
-    "Качество ответов здесь не оценивается — оценка автора в experiments/feod-rag/README.md.",
+    `Положительный вопрос — с ожидаемыми источниками, отрицательный — без них. hit@${topK}, MRR и покрытие считаются только по положительным вопросам, последняя доля — только по отрицательным; «—» — знаменатель равен нулю.`,
+    "hit@K — доля вопросов, у которых итоговые чанки содержат хотя бы один ожидаемый файл; MRR — среднее 1/позиция первого ожидаемого чанка (0, если его нет);",
+    "покрытие — найденные уникальные пары «вопрос — ожидаемый файл» из всех ожидаемых. Метрики считаются по файлам итоговых чанков: это не оценка релевантности чанков и не качество ответа.",
+    "Время режима — сумма его этапов, включая общие с парным режимом поиск и rewrite; сумма времён четырёх режимов не равна длительности прогона.",
     "",
   ];
 }
 
-function hitRow(hit: SearchHit, expected: readonly string[]): string {
-  const { chunk } = hit;
-  const mark = expected.length === 0 ? "—" : expected.includes(chunk.file) ? "да" : "нет";
-  const sections = tableCell(chunk.sections.join("; "));
-  return `| ${hit.rank} | ${hit.score.toFixed(3)} | \`${chunk.file}\` | ${sections} | ${mark} |`;
-}
-
-function section(result: QuestionResult): string[] {
+function questionRow(result: QuestionResult): string {
   const { question } = result;
+  const cells = RETRIEVAL_MODES.map((mode) => {
+    const { hits } = result.outcomes[mode].selection;
+    const found =
+      question.sources.length === 0 ? "" : `${foundSources(question, hits).length} из ${question.sources.length}, `;
+    return `${found}чанков ${hits.length}`;
+  });
+  return `| ${[question.id, filesList(question.sources), ...cells].join(" | ")} |`;
+}
+
+function questionSummary(data: EvalReportData): string[] {
   return [
-    `## ${question.id}. ${question.question}`,
+    "## Сводка по вопросам",
     "",
-    `**Ожидание.** ${question.expectation}`,
+    `| Вопрос | Ожидаемые источники | ${RETRIEVAL_MODES.join(" | ")} |`,
+    `|---|---|${RETRIEVAL_MODES.map(() => "---").join("|")}|`,
+    ...data.results.map(questionRow),
     "",
-    `**Ожидаемые источники:** ${files(question.sources)}`,
-    "",
-    "### Найденные фрагменты",
-    "",
-    "| Ранг | Сходство | Файл | Разделы | Ожидаемый |",
-    "|---|---|---|---|---|",
-    ...result.hits.map((hit) => hitRow(hit, question.sources)),
-    "",
-    "### Ответ без RAG",
-    "",
-    ...quoteBlock(result.plainAnswer),
-    "",
-    "### Ответ с RAG",
-    "",
-    ...quoteBlock(result.ragAnswer),
+    "Измерено: время этапов, размер сообщения. Вычислено: сходство, отбор, попадание ожидаемых файлов. Качество ответов здесь не оценивается — оценка автора в README эксперимента.",
     "",
   ];
 }
 
-/** Отчёт `rag-eval.md`: измерения и ответы обоих режимов; оценки качества в него не входят. */
+/** Отчёт `rag-eval.md`: измерения и ответы четырёх режимов; оценки качества в него не входят. */
 export function renderEvalReport(data: EvalReportData): string {
-  return [...header(data), ...summary(data), ...data.results.flatMap(section)].join("\n");
+  return [
+    ...header(data),
+    ...modeSummary(data),
+    ...questionSummary(data),
+    ...data.results.flatMap(questionSection),
+  ].join("\n");
 }

@@ -8,7 +8,15 @@ export type HelpSetting = Readonly<{ flag: string; type: string; description: st
 export type ConfigRow = Readonly<{ key: string; value: string; source: string }>;
 export type CommandView = Pick<
   CliView,
-  "answer" | "help" | "config" | "indexBuilt" | "comparisonSaved" | "ragAnswer" | "ragMode" | "evalSaved"
+  | "answer"
+  | "help"
+  | "config"
+  | "indexBuilt"
+  | "comparisonSaved"
+  | "calibrationSaved"
+  | "ragAnswer"
+  | "ragMode"
+  | "evalSaved"
 >;
 
 const fallbackWidth = 88;
@@ -31,10 +39,10 @@ export class CliView {
     this.#block("Ответ агента", [text]);
   }
 
-  /** Ответ с RAG: текст модели и под ним найденные фрагменты, чтобы режимы различались на экране. */
+  /** Ответ с RAG: текст модели и под ним фрагменты, переданные модели; пустой список — контекст без фрагментов. */
   ragAnswer(text: string, fragments: readonly string[]): void {
     const label = this.#paint("key", "Фрагменты:");
-    const listed = fragments.length > 0 ? [label, ...fragments.map((line) => `  ${line}`)] : [`${label} не найдены`];
+    const listed = fragments.length > 0 ? [label, ...fragments.map((line) => `  ${line}`)] : [`${label} контекст пуст`];
     this.#block("Ответ агента · RAG", [text, "", ...listed]);
   }
 
@@ -85,6 +93,10 @@ export class CliView {
 
   comparisonSaved(lines: readonly string[], path: string): void {
     this.#block("Сравнение стратегий", [...lines, "", this.#paint("muted", `Сохранено: ${path}`)]);
+  }
+
+  calibrationSaved(lines: readonly string[], path: string): void {
+    this.#block("Калибровка порога", [...lines, "", this.#paint("muted", `Сохранено: ${path}`)]);
   }
 
   evalSaved(lines: readonly string[], path: string): void {

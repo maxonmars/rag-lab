@@ -16,6 +16,8 @@ export type InvokeOptions = Readonly<{
   interactive?: boolean;
   complete?: CompleteMock;
   embeddings?: EmbeddingPort;
+  /** Дополнительные переменные окружения процесса; ключ DeepSeek задаётся `authenticated`. */
+  env?: Readonly<Record<string, string>>;
 }>;
 
 const echo = (request: ModelRequest): Promise<ModelCompletion> =>
@@ -43,7 +45,7 @@ export async function invoke(argv: string[], options: InvokeOptions) {
   const code = await run({
     argv,
     cwd: options.cwd,
-    env: options.authenticated === false ? {} : { LAB_LLM_API_KEY: "test-key" },
+    env: { ...(options.authenticated === false ? {} : { LAB_LLM_API_KEY: "test-key" }), ...options.env },
     createModel,
     createEmbeddings,
     terminal: {
@@ -61,6 +63,19 @@ export function fakeEmbeddings(): EmbeddingPort {
   return {
     embed: async (texts) => ({
       vectors: texts.map((text) => [text.length, 1]),
+      promptTokens: texts.length,
+      loadDurationMs: 1,
+    }),
+    describeModel: async () => ({ name: "fake:latest", digest: "0123456789abcdef" }),
+  };
+}
+
+/** Вектор — число вхождений слов словаря: близость запроса к чанку задаётся общими словами, остальные тексты дают нулевой вектор. */
+export function keywordEmbeddings(vocabulary: readonly string[]): EmbeddingPort {
+  const count = (text: string, word: string) => text.toLowerCase().split(word).length - 1;
+  return {
+    embed: async (texts) => ({
+      vectors: texts.map((text) => vocabulary.map((word) => count(text, word))),
       promptTokens: texts.length,
       loadDurationMs: 1,
     }),

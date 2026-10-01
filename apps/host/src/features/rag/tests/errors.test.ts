@@ -31,6 +31,14 @@ const CASES: readonly [RagErrorCode, Record<string, string | number>, string][] 
   ["QUESTIONS_INVALID", { reason: "duplicate", id: "q04" }, "идентификатор повторяется (q04)."],
   ["QUESTIONS_INVALID", { reason: "source", id: "q05", file: "a.md" }, "источник не найден в индексе (q05, a.md)."],
   ["QUESTIONS_INVALID", { reason: "other" }, "неизвестная причина."],
+  ["INVALID_RETRIEVAL_PARAMS", { reason: "candidateTopK" }, "rag.candidateTopK должен быть целым числом от 1 до 20."],
+  ["INVALID_RETRIEVAL_PARAMS", { reason: "topK" }, "rag.topK должен быть целым числом от 1 до 20."],
+  ["INVALID_RETRIEVAL_PARAMS", { reason: "order" }, "rag.topK не должен превышать rag.candidateTopK."],
+  ["INVALID_RETRIEVAL_PARAMS", { reason: "threshold" }, "rag.similarityThreshold должен быть числом от -1 до 1."],
+  ["INVALID_RETRIEVAL_PARAMS", { reason: "other" }, "Параметры поиска несовместимы."],
+  ["REWRITE_INVALID", { reason: "multiline" }, "некорректный поисковый запрос: запрос занимает несколько строк."],
+  ["REWRITE_INVALID", { reason: "fence" }, "некорректный поисковый запрос: запрос обёрнут в Markdown-забор."],
+  ["REWRITE_INVALID", { reason: "other" }, "некорректный поисковый запрос: неизвестная причина."],
 ];
 
 it.each(CASES)("%s %j → сообщение называет причину и следующий шаг", (code, data, expected) => {

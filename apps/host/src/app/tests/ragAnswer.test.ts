@@ -35,7 +35,10 @@ const requestOf = (result: { complete: { mock: { calls: unknown[][] } } }, call 
 
 describe("rag ask", () => {
   it("печатает ответ с фрагментами; модель получает system.md, инструкцию RAG и фрагменты с вопросом", async () => {
-    const result = await invoke(["rag", "ask", "Что такое короткий документ?"], { cwd, embeddings: fakeEmbeddings() });
+    const result = await invoke(["--rag-retrieval-mode=baseline", "rag", "ask", "Что такое короткий документ?"], {
+      cwd,
+      embeddings: fakeEmbeddings(),
+    });
     expect(result.code).toBe(0);
     expect(result.output).toContain("── Ответ агента · RAG ──");
     expect(result.output).toContain("Фрагменты:");
@@ -51,8 +54,15 @@ describe("rag ask", () => {
   });
 
   it("--rag-top-k ограничивает число фрагментов", async () => {
-    const one = await invoke(["--rag-top-k=1", "rag", "ask", "Вопрос"], { cwd, embeddings: fakeEmbeddings() });
-    const many = await invoke(["--rag-top-k=20", "rag", "ask", "Вопрос"], { cwd, embeddings: fakeEmbeddings() });
+    const baseline = "--rag-retrieval-mode=baseline";
+    const one = await invoke([baseline, "--rag-top-k=1", "rag", "ask", "Вопрос"], {
+      cwd,
+      embeddings: fakeEmbeddings(),
+    });
+    const many = await invoke([baseline, "--rag-candidate-top-k=20", "--rag-top-k=20", "rag", "ask", "Вопрос"], {
+      cwd,
+      embeddings: fakeEmbeddings(),
+    });
     expect(one.output.match(/^ {2}\d+\. /gm)).toHaveLength(1);
     expect(many.output.match(/^ {2}\d+\. /gm)?.length).toBeGreaterThan(1);
     expect(requestOf(one).messages[1]?.content).not.toContain("### Фрагмент 2");
@@ -65,10 +75,18 @@ describe("rag ask", () => {
     const small = ["--rag-chunk-size-chars=300", "--rag-overlap-chars=0", "--rag-min-chunk-chars=100"];
     await invoke([...small, "rag", "index"], { cwd, embeddings: fakeEmbeddings() });
     const ask = (strategy: string) =>
-      invoke([`--rag-chunk-strategy=${strategy}`, "--rag-top-k=20", "rag", "ask", "Вопрос"], {
-        cwd,
-        embeddings: fakeEmbeddings(),
-      });
+      invoke(
+        [
+          "--rag-retrieval-mode=baseline",
+          `--rag-chunk-strategy=${strategy}`,
+          "--rag-candidate-top-k=20",
+          "--rag-top-k=20",
+          "rag",
+          "ask",
+          "Вопрос",
+        ],
+        { cwd, embeddings: fakeEmbeddings() },
+      );
     const [structure, fixed] = [await ask("structure"), await ask("fixed")];
     expect(fixed.code).toBe(0);
     expect(requestOf(fixed).messages[1]?.content).not.toBe(requestOf(structure).messages[1]?.content);
@@ -77,6 +95,7 @@ describe("rag ask", () => {
   it.each([
     ["--rag-top-k=0", "rag.topK"],
     ["--rag-top-k=21", "rag.topK"],
+    ["--rag-top-k=1.5", "rag.topK"],
     ["--rag-chunk-strategy=hybrid", "rag.chunkStrategy"],
   ])("%s отклоняется до обращения к модели и Ollama", async (flag, key) => {
     const result = await invoke([flag, "rag", "ask", "Вопрос"], { cwd, embeddings: fakeEmbeddings() });
@@ -114,17 +133,21 @@ describe("rag ask", () => {
 });
 
 describe("режим сессии REPL", () => {
-  it("/rag on отправляет обычную строку в RAG, /rag off возвращает ответ без поиска", async () => {
+  it("/rag on отправляет обычную строку в настроенный конвейер, /rag off возвращает ответ без поиска", async () => {
     const input = "/rag on\nВопрос один\n/rag off\nВопрос два\n/exit\n";
     const result = await invoke([], { cwd, input, embeddings: fakeEmbeddings() });
     expect(result.code).toBe(0);
-    expect(result.output).toContain("── Режим ──\n\nОтветы с RAG: стратегия structure, top-5.");
+    expect(result.output).toContain(
+      "── Режим ──\n\nОтветы с RAG: стратегия structure, режим rewrite-filter, кандидатов 10, итоговый top-5, порог 0.55.",
+    );
     expect(result.output).toContain("Ответы без RAG.");
     expect(result.output.match(/── Ответ агента · RAG ──/g)).toHaveLength(1);
     expect(result.output).toContain("\n── Ответ агента ──\n\nОтвет: Вопрос два\n");
-    expect(requestOf(result, 0).messages[1]?.content).toContain("## Вопрос\n\nВопрос один");
-    expect(requestOf(result, 1).messages[1]?.content).toBe("Вопрос два");
-    expect(requestOf(result, 1).messages[0]?.content).not.toContain("фрагменты документации");
+    expect(result.complete).toHaveBeenCalledTimes(3);
+    expect(requestOf(result, 0).messages[0]?.content).toContain("переписываешь");
+    expect(requestOf(result, 1).messages[1]?.content).toContain("## Вопрос\n\nВопрос один");
+    expect(requestOf(result, 2).messages[1]?.content).toBe("Вопрос два");
+    expect(requestOf(result, 2).messages[0]?.content).not.toContain("фрагменты документации");
   });
 
   it("/ask следует режиму сессии, а режим по умолчанию — без RAG", async () => {
@@ -144,33 +167,57 @@ describe("режим сессии REPL", () => {
 });
 
 describe("rag eval", () => {
-  const questionsFile = () => writeCorpus(join(cwd, "experiments/feod-rag"), { "questions.md": QUESTIONS });
+  const questionsFile = () => writeCorpus(join(cwd, "experiments/feod-retrieval"), { "questions.md": QUESTIONS });
 
-  it("прогоняет вопросы в обоих режимах, пишет rag-eval.md и показывает ход в stderr", async () => {
+  it("сравнивает четыре режима: пять вызовов модели на вопрос, ход в stderr, итог по режимам в stdout", async () => {
     questionsFile();
     const result = await invoke(["rag", "eval"], { cwd, embeddings: fakeEmbeddings() });
     const report = join(cwd, ".local/rag/rag-eval.md");
     expect(result.code).toBe(0);
-    expect(result.complete).toHaveBeenCalledTimes(4);
-    expect(result.error).toContain("q01: без RAG\nq01: с RAG\nq02: без RAG\nq02: с RAG");
+    expect(result.complete).toHaveBeenCalledTimes(10);
+    expect(result.error).toContain(
+      [
+        "q01: поиск исходным вопросом",
+        "q01: baseline",
+        "q01: filter",
+        "q01: переписывание запроса",
+        "q01: rewrite",
+        "q01: rewrite-filter",
+        "q02: поиск исходным вопросом",
+      ].join("\n"),
+    );
     expect(result.output).toContain("── Контрольные вопросы ──");
-    expect(result.output).toContain("Вопросов: 2");
-    expect(result.output).toMatch(/Ожидаемые источники в top-5: [01] из 1/);
+    expect(result.output).toContain("Вопросов: 2\nДлительность прогона: ");
+    for (const mode of ["baseline", "filter", "rewrite", "rewrite-filter"]) {
+      expect(result.output).toMatch(
+        new RegExp(
+          `${mode}: hit@5 [01] из 1, MRR [01]\\.\\d\\d, источники [01] из 1, отрицательные с контекстом 1 из 1`,
+        ),
+      );
+    }
     expect(result.output).toContain(`Сохранено: ${report}`);
     const text = readFileSync(report, "utf8");
-    expect(text).toContain("# Контрольные вопросы: ответы без RAG и с RAG");
+    expect(text).toContain("# Сравнение режимов поиска");
     expect(text).toContain("## q02. Чего в корпусе нет?");
   });
 
-  it("файл вопросов и поиск настраиваются: --rag-questions-file и --rag-top-k", async () => {
-    writeCorpus(join(cwd, "own"), { "q.md": QUESTIONS });
-    const result = await invoke(["--rag-questions-file=own/q.md", "--rag-top-k=2", "rag", "eval"], {
+  it("запускает все четыре режима независимо от rag.retrievalMode", async () => {
+    questionsFile();
+    const result = await invoke(["--rag-retrieval-mode=baseline", "rag", "eval"], {
       cwd,
       embeddings: fakeEmbeddings(),
     });
     expect(result.code).toBe(0);
-    expect(result.output).toContain("Ожидаемые источники в top-2");
-    expect(readFileSync(join(cwd, ".local/rag/rag-eval.md"), "utf8")).toContain("top-2");
+    expect(result.complete).toHaveBeenCalledTimes(10);
+  });
+
+  it("файл вопросов и лимиты настраиваются: --rag-questions-file, --rag-candidate-top-k и --rag-top-k", async () => {
+    writeCorpus(join(cwd, "own"), { "q.md": QUESTIONS });
+    const flags = ["--rag-questions-file=own/q.md", "--rag-candidate-top-k=3", "--rag-top-k=2"];
+    const result = await invoke([...flags, "rag", "eval"], { cwd, embeddings: fakeEmbeddings() });
+    expect(result.code).toBe(0);
+    expect(result.output).toContain("hit@2");
+    expect(readFileSync(join(cwd, ".local/rag/rag-eval.md"), "utf8")).toContain("кандидатов 3, итоговый top-2");
   });
 
   it("без файла вопросов сообщает про rag.questionsFile и не пишет отчёт", async () => {

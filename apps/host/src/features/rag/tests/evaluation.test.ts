@@ -1,156 +1,103 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { RagAnswer } from "../answer.ts";
-import { RagError } from "../errors.ts";
-import { type EvalOptions, type EvalProgress, evaluateQuestions } from "../evaluation.ts";
-import type { SearchHit, SearchIndex } from "../search.ts";
+import { describe, expect, it } from "vitest";
+import { type EvalProgress, evaluateQuestions } from "../evaluation.ts";
+import { evalRoot, REPORT_NAME, setupEval } from "./evalSetup.ts";
 
-const QUESTIONS = [
-  "# Вопросы",
-  "",
-  "## q01. Что в первом файле?",
-  "Ожидание: первый файл.",
-  "Источники: a.md",
-  "",
-  "## q02. Что в обоих файлах?",
-  "Ожидание: оба файла.",
-  "Источники: a.md, b.md",
-  "",
-  "## q03. Чего нет в документации?",
-  "Ожидание: ответа нет.",
-  "Источники: —",
-].join("\n");
+const root = evalRoot();
+const QUESTION_TEXTS = ["Что в первом файле?", "Что в обоих файлах?", "Чего нет в документации?"];
 
-const hit = (rank: number, file: string): SearchHit => ({
-  rank,
-  score: 1 - rank / 10,
-  chunk: {
-    chunk_id: `${file}#${rank}`,
-    strategy: "structure",
-    source: "src",
-    title: "Doc",
-    file,
-    sections: ["Doc › Раздел | с чертой"],
-    start: 0,
-    end: 1,
-    text: "т",
-  },
-});
+describe("evaluateQuestions: порядок и число вызовов", () => {
+  it("на вопрос — исходный поиск, два ответа, один rewrite, один поиск, два ответа", async () => {
+    const { options, log } = setupEval(root.path);
+    await evaluateQuestions(options);
+    const perQuestion = (question: string) => [
+      `search:${question}`,
+      "answer",
+      "answer",
+      "rewrite",
+      `search:запрос: ${question}`,
+      "answer",
+      "answer",
+    ];
+    expect(log).toEqual(QUESTION_TEXTS.flatMap(perQuestion));
+  });
 
-const index: SearchIndex = {
-  createdAt: "2026-09-29T10:00:00.000Z",
-  model: { name: "bge-m3:latest", digest: "790764642607abcdef", dimension: 2 },
-  files: ["a.md", "b.md", "c.md"],
-  search: async () => [],
-};
+  it("15 вызовов модели и 6 поисков на три вопроса; поиск запрашивает candidateTopK кандидатов", async () => {
+    const { options, search, kinds } = setupEval(root.path);
+    await evaluateQuestions(options);
+    expect(kinds.filter((kind) => kind === "rewrite")).toHaveLength(3);
+    expect(kinds.filter((kind) => kind === "answer")).toHaveLength(12);
+    expect(search).toHaveBeenCalledTimes(6);
+    for (const call of search.mock.calls) expect(call.slice(1)).toEqual(["structure", 4]);
+  });
 
-let root: string;
-beforeEach(() => {
-  root = mkdtempSync(join(tmpdir(), "rag-lab-eval-"));
-  writeFileSync(join(root, "questions.md"), QUESTIONS);
-});
-afterEach(() => {
-  rmSync(root, { recursive: true, force: true });
-});
-
-function options(overrides: Partial<EvalOptions> = {}): EvalOptions {
-  const hitsByQuestion: Record<string, SearchHit[]> = {
-    "Что в первом файле?": [hit(1, "c.md"), hit(2, "a.md")],
-    "Что в обоих файлах?": [hit(1, "b.md")],
-    "Чего нет в документации?": [hit(1, "c.md")],
-  };
-  return {
-    questionsFile: join(root, "questions.md"),
-    reportFile: join(root, "out", "rag-eval.md"),
-    index,
-    strategy: "structure",
-    topK: 5,
-    meta: { questionsFile: "experiments/feod-rag/questions.md", llmModel: "deepseek-flash" },
-    askPlain: async (question) => `без RAG: ${question}\n\nвторой абзац`,
-    askRag: async (question): Promise<RagAnswer> => ({
-      answer: `с RAG: ${question}`,
-      hits: hitsByQuestion[question] ?? [],
-      contextChars: 4210,
-    }),
-    now: () => new Date("2026-09-29T12:00:00Z"),
-    ...overrides,
-  };
-}
-
-describe("прогон контрольных вопросов", () => {
-  it("вызывает режимы по порядку, сообщает прогресс и считает попадание источников", async () => {
-    const order: string[] = [];
+  it("сообщает шаги прогресса в порядке выполнения", async () => {
     const events: EvalProgress[] = [];
-    const result = await evaluateQuestions(
-      options({
-        onProgress: (event) => events.push(event),
-        askPlain: async (question) => {
-          order.push(`plain:${question}`);
-          return "ответ";
-        },
-        askRag: async (question) => {
-          order.push(`rag:${question}`);
-          return { answer: "ответ", hits: [hit(1, "b.md")], contextChars: 10 };
-        },
-      }),
+    const { options } = setupEval(root.path, { onProgress: (event) => events.push(event) });
+    await evaluateQuestions(options);
+    expect(events.slice(0, 6)).toEqual(
+      ["search", "baseline", "filter", "query-rewrite", "rewrite", "rewrite-filter"].map((step) => ({
+        id: "q01",
+        step,
+      })),
     );
-    expect(order).toEqual([
-      "plain:Что в первом файле?",
-      "rag:Что в первом файле?",
-      "plain:Что в обоих файлах?",
-      "rag:Что в обоих файлах?",
-      "plain:Чего нет в документации?",
-      "rag:Чего нет в документации?",
-    ]);
-    expect(events.slice(0, 3)).toEqual([
-      { id: "q01", mode: "plain" },
-      { id: "q01", mode: "rag" },
-      { id: "q02", mode: "plain" },
-    ]);
-    expect(events).toHaveLength(6);
-    expect(result).toMatchObject({ questions: 3, expectedSources: 3, foundSources: 1 });
-    expect(result.path).toBe(join(root, "out", "rag-eval.md"));
-    expect(result.plainMs).toBeGreaterThanOrEqual(0);
-    expect(result.ragMs).toBeGreaterThanOrEqual(0);
+    expect(events).toHaveLength(18);
+  });
+});
+
+describe("evaluateQuestions: контекст режимов", () => {
+  it("исходный вопрос идёт во все четыре ответа, переписанная строка — только в поиск", async () => {
+    const { options, requests } = setupEval(root.path);
+    await evaluateQuestions(options);
+    const answers = requests.filter((request) => !String(request.messages[0]?.content).includes("переписываешь"));
+    expect(answers).toHaveLength(12);
+    answers.forEach((request, position) => {
+      const question = QUESTION_TEXTS[Math.floor(position / 4)] ?? "";
+      const user = String(request.messages[1]?.content);
+      expect(user.endsWith(`## Вопрос\n\n${question}`)).toBe(true);
+      expect(user).not.toContain("запрос:");
+    });
   });
 
-  it("пишет отчёт: шапка, сводка, ранги, вопрос без источников и ответы в цитатах", async () => {
-    await evaluateQuestions(options());
-    const report = readFileSync(join(root, "out", "rag-eval.md"), "utf8");
-    expect(report).toContain("Прогон 2026-09-29T12:00:00.000Z. Вопросы: `experiments/feod-rag/questions.md` (3).");
-    expect(report).toContain("модель эмбеддингов `bge-m3:latest` (digest 790764642607)");
-    expect(report).toContain("Модель ответов: `deepseek-flash`. Поиск: стратегия structure, top-5");
-    expect(report).toContain("| q01 | 1 из 1 | 2 | 4 210 |");
-    expect(report).toContain("| q02 | 1 из 2 | 1 | 4 210 |");
-    expect(report).toContain("| q03 | — | — | 4 210 |");
-    expect(report).toContain("Найдено ожидаемых источников: 2 из 3.");
-    expect(report).toContain("**Ожидаемые источники:** `a.md`, `b.md`");
-    expect(report).toContain("**Ожидаемые источники:** —");
-    expect(report).toContain("| 2 | 0.800 | `a.md` | Doc › Раздел \\| с чертой | да |");
-    expect(report).toContain("| 1 | 0.900 | `c.md` | Doc › Раздел \\| с чертой | — |");
-    expect(report).toContain("### Ответ без RAG\n\n> без RAG: Что в первом файле?\n>\n> второй абзац");
-    expect(report).toContain("### Ответ с RAG\n\n> с RAG: Что в первом файле?");
+  it("filter получает кандидатов baseline, rewrite-filter — кандидатов rewrite: чанки режимов различаются порогом", async () => {
+    const { options, requests } = setupEval(root.path);
+    await evaluateQuestions(options);
+    const answers = requests.filter((request) => !String(request.messages[0]?.content).includes("переписываешь"));
+    const fragments = answers
+      .slice(0, 4)
+      .map((request) => String(request.messages[1]?.content).match(/### Фрагмент/g)?.length);
+    expect(fragments).toEqual([3, 2, 3, 2]);
+    const files = (position: number) => String(answers[position]?.messages[1]?.content).match(/- Файл: `(.+)`/g);
+    expect(files(0)).toEqual(["- Файл: `c.md`", "- Файл: `a.md`", "- Файл: `b.md`"]);
+    expect(files(1)).toEqual(["- Файл: `c.md`", "- Файл: `a.md`"]);
+    expect(files(2)).toEqual(["- Файл: `a.md`", "- Файл: `b.md`", "- Файл: `c.md`"]);
+    expect(files(3)).toEqual(["- Файл: `a.md`", "- Файл: `b.md`"]);
   });
 
-  it("неизвестный источник отклоняется до первого вызова модели", async () => {
-    writeFileSync(join(root, "questions.md"), "## q01. Вопрос\nОжидание: x\nИсточники: a.md, нет.md");
-    const askPlain = vi.fn(async () => "ответ");
-    const error = await evaluateQuestions(options({ askPlain })).catch((caught: unknown) => caught);
-    expect(error).toBeInstanceOf(RagError);
-    expect((error as RagError).data).toEqual({ reason: "source", id: "q01", file: "нет.md" });
-    expect(askPlain).not.toHaveBeenCalled();
+  it("пустой контекст не пропускает ответ: модель вызывается во всех режимах", async () => {
+    const { options, requests, kinds } = setupEval(root.path, { threshold: 0.95 });
+    await evaluateQuestions(options);
+    expect(kinds.filter((kind) => kind === "answer")).toHaveLength(12);
+    const empty = requests.filter(
+      (request) => request.messages[1]?.content === "## Фрагменты документации\n\n## Вопрос\n\nЧто в первом файле?",
+    );
+    expect(empty).toHaveLength(2);
   });
+});
 
-  it("ошибка модели прерывает прогон, отчёт не создаётся", async () => {
-    let calls = 0;
-    const askRag = async (): Promise<RagAnswer> => {
-      if (++calls === 2) throw new Error("сбой модели");
-      return { answer: "ответ", hits: [], contextChars: 1 };
-    };
-    await expect(evaluateQuestions(options({ askRag }))).rejects.toThrow("сбой модели");
-    expect(calls).toBe(2);
-    expect(existsSync(join(root, "out", "rag-eval.md"))).toBe(false);
+describe("evaluateQuestions: результат", () => {
+  it("считает метрики четырёх режимов по итоговым hits и возвращает фактическую длительность", async () => {
+    const { options } = setupEval(root.path);
+    const result = await evaluateQuestions(options);
+    expect(result.path).toBe(join(root.path, "out", REPORT_NAME));
+    expect(result.questions).toBe(3);
+    expect(result.wallMs).toBeGreaterThanOrEqual(0);
+    const { baseline, filter, rewrite } = result.metrics;
+    expect([baseline.hitAtK, baseline.mrr, baseline.foundPairs, baseline.nonEmptyNegatives]).toEqual([1, 0.5, 3, 1]);
+    expect([filter.hitAtK, filter.mrr, filter.foundPairs, filter.nonEmptyNegatives]).toEqual([1, 0.5, 2, 1]);
+    expect([rewrite.hitAtK, rewrite.mrr, rewrite.foundPairs]).toEqual([1, 1, 3]);
+    expect(result.metrics["rewrite-filter"].meanHits).toBe(2);
+    expect(readFileSync(result.path, "utf8")).toContain("# Сравнение режимов поиска");
   });
 });

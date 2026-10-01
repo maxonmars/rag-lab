@@ -1,84 +1,148 @@
-import { readFileSync } from "node:fs";
-import { describe, expect, it, vi } from "vitest";
-import { AgentError, type ModelRequest } from "../../../core/index.ts";
-import { answerWithRag } from "../answer.ts";
+import { describe, expect, it } from "vitest";
+import { AgentError } from "../../../core/index.ts";
+import { answerWithRag, generateAnswer, type RagAnswerOptions } from "../answer.ts";
 import { renderRagMessage } from "../context.ts";
-import type { SearchHit, SearchIndex } from "../search.ts";
+import { readPrompt } from "../prompts.ts";
+import type { SearchHit } from "../search.ts";
+import { fakeModel, fakeSearchIndex, searchHit } from "./support.ts";
 
-const hits: SearchHit[] = [
-  {
-    rank: 1,
-    score: 0.9,
-    chunk: {
-      chunk_id: "c1",
-      strategy: "structure",
-      source: "src",
-      title: "Global",
-      file: "structure/global.md",
-      sections: ["Global"],
-      start: 0,
-      end: 5,
-      text: "текст",
-    },
-  },
-];
+const CANDIDATES = [searchHit(1, "a.md", 0.9), searchHit(2, "b.md", 0.6), searchHit(3, "c.md", 0.4)];
 
-function setup() {
-  const search = vi.fn(async () => hits);
-  const index: SearchIndex = {
-    createdAt: "2026-09-29T10:00:00.000Z",
-    model: { name: "fake:latest", digest: "0123456789abcdef", dimension: 2 },
-    files: ["structure/global.md"],
-    search,
+function setup(overrides: Partial<RagAnswerOptions> = {}, modelOptions: Parameters<typeof fakeModel>[0] = {}) {
+  const { index, search } = fakeSearchIndex(() => CANDIDATES);
+  const { model, requests, kinds } = fakeModel(modelOptions);
+  const options: RagAnswerOptions = {
+    question: "  Что такое global?  ",
+    index,
+    strategy: "structure",
+    mode: "baseline",
+    candidateTopK: 10,
+    topK: 2,
+    threshold: 0.5,
+    model,
+    systemPrompt: "Системная инструкция.",
+    ...overrides,
   };
-  const complete = vi.fn(async (_request: ModelRequest) => ({ type: "text" as const, content: "готовый ответ" }));
-  return { index, search, complete, model: { complete } };
+  return { options, search, requests, kinds };
 }
 
 describe("answerWithRag", () => {
-  it("отправляет системную инструкцию с prompts/answer.md и сообщение с фрагментами", async () => {
-    const { index, search, complete, model } = setup();
-    const result = await answerWithRag({
-      question: "  Что такое global?  ",
-      index,
-      strategy: "fixed",
-      topK: 3,
-      model,
-      systemPrompt: "Системная инструкция.",
-    });
-    const instruction = readFileSync(new URL("../prompts/answer.md", import.meta.url), "utf8").trim();
-    const message = renderRagMessage("Что такое global?", hits);
-    expect(search).toHaveBeenCalledWith("Что такое global?", "fixed", 3);
-    expect(complete.mock.calls[0]?.[0].messages).toEqual([
-      { role: "system", content: `Системная инструкция.\n\n${instruction}` },
+  it("baseline: без rewrite ищет исходный вопрос, отправляет системную инструкцию с answer.md и фрагменты", async () => {
+    const { options, search, requests, kinds } = setup();
+    const result = await answerWithRag(options);
+    const message = renderRagMessage("Что такое global?", CANDIDATES.slice(0, 2));
+    expect(search).toHaveBeenCalledExactlyOnceWith("Что такое global?", "structure", 10);
+    expect(kinds).toEqual(["answer"]);
+    expect(requests[0]?.messages).toEqual([
+      { role: "system", content: `Системная инструкция.\n\n${readPrompt("answer.md")}` },
       { role: "user", content: message },
     ]);
-    expect(result).toEqual({ answer: "готовый ответ", hits, contextChars: [...message].length });
+    expect(result).toMatchObject({
+      hits: CANDIDATES.slice(0, 2),
+      candidates: CANDIDATES,
+      query: "Что такое global?",
+      contextChars: [...message].length,
+    });
+    expect(result.answer).toContain("ответ:");
   });
 
-  it("считает размер контекста в кодовых точках, а не в единицах UTF-16", async () => {
-    const { index: base, model } = setup();
-    const emoji = { ...hits[0], chunk: { ...(hits[0] as SearchHit).chunk, text: "😀" } } as SearchHit;
-    const index: SearchIndex = { ...base, search: async () => [emoji] };
-    const result = await answerWithRag({
-      question: "Q",
-      index,
-      strategy: "structure",
-      topK: 1,
-      model,
-      systemPrompt: "S",
-    });
+  it("filter не вызывает rewrite и убирает кандидатов ниже порога", async () => {
+    const { options, kinds } = setup({ mode: "filter", topK: 3, threshold: 0.5 });
+    const result = await answerWithRag(options);
+    expect(kinds).toEqual(["answer"]);
+    expect(result.hits).toEqual(CANDIDATES.slice(0, 2));
+    expect(result.candidates).toHaveLength(3);
+    expect(result.timings.rewriteMs).toBe(0);
+  });
+
+  it("rewrite: поиск идёт по переписанной строке, а генерация получает исходный вопрос", async () => {
+    const { options, search, requests, kinds } = setup({ mode: "rewrite" }, { rewrite: () => "определение global" });
+    const result = await answerWithRag(options);
+    expect(search).toHaveBeenCalledExactlyOnceWith("определение global", "structure", 10);
+    expect(kinds).toEqual(["rewrite", "answer"]);
+    expect(String(requests[1]?.messages[1]?.content).endsWith("## Вопрос\n\nЧто такое global?")).toBe(true);
+    expect(requests[1]?.messages[1]?.content).not.toContain("определение global");
+    expect(result.query).toBe("определение global");
+  });
+
+  it("rewrite-filter: один rewrite, один поиск, порог применяется к кандидатам переписанного запроса", async () => {
+    const { options, search, kinds } = setup({ mode: "rewrite-filter", topK: 3, threshold: 0.7 });
+    const result = await answerWithRag(options);
+    expect(kinds).toEqual(["rewrite", "answer"]);
+    expect(search).toHaveBeenCalledTimes(1);
+    expect(result.hits).toEqual([CANDIDATES[0]]);
+  });
+
+  it("возвращает длительности всех этапов; для режима без rewrite rewriteMs равен 0", async () => {
+    const { options } = setup({ mode: "rewrite-filter" });
+    const { timings } = await answerWithRag(options);
+    for (const value of Object.values(timings)) {
+      expect(Number.isFinite(value)).toBe(true);
+      expect(value).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it("пустые hits не мешают ответу: модель вызывается с сообщением без фрагментов и исходным вопросом", async () => {
+    const { options, requests } = setup({ mode: "filter", threshold: 0.99 });
+    const result = await answerWithRag(options);
+    expect(result.hits).toEqual([]);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.messages[1]?.content).toBe("## Фрагменты документации\n\n## Вопрос\n\nЧто такое global?");
+    expect(requests[0]?.messages[0]?.content).toContain(readPrompt("answer.md"));
+  });
+
+  it("считает размер сообщения в кодовых точках, а не в единицах UTF-16", async () => {
+    const base = searchHit(1, "a.md", 0.9);
+    const emoji: SearchHit = { ...base, chunk: { ...base.chunk, text: "😀" } };
+    const { index } = fakeSearchIndex(() => [emoji]);
+    const { options } = setup({ index, question: "Q" });
+    const result = await answerWithRag(options);
     const message = renderRagMessage("Q", [emoji]);
     expect(message.length).toBeGreaterThan([...message].length);
     expect(result.contextChars).toBe([...message].length);
   });
 
-  it("пустой вопрос отклоняется до поиска и запроса к модели", async () => {
-    const { index, search, complete, model } = setup();
-    const call = answerWithRag({ question: "   ", index, strategy: "structure", topK: 1, model, systemPrompt: "S" });
+  it("пустой вопрос отклоняется до rewrite и поиска", async () => {
+    const { options, search, requests } = setup({ question: "   ", mode: "rewrite-filter" });
+    const call = answerWithRag(options);
     await expect(call).rejects.toBeInstanceOf(AgentError);
     await expect(call).rejects.toMatchObject({ code: "EMPTY_INPUT" });
     expect(search).not.toHaveBeenCalled();
-    expect(complete).not.toHaveBeenCalled();
+    expect(requests).toHaveLength(0);
+  });
+
+  it("несогласованные параметры отклоняются до rewrite, поиска и генерации", async () => {
+    const { options, search, requests } = setup({ mode: "rewrite-filter", candidateTopK: 2, topK: 5 });
+    await expect(answerWithRag(options)).rejects.toMatchObject({
+      code: "INVALID_RETRIEVAL_PARAMS",
+      data: { reason: "order" },
+    });
+    expect(search).not.toHaveBeenCalled();
+    expect(requests).toHaveLength(0);
+  });
+
+  it("ошибка rewrite не запускает поиск и генерацию", async () => {
+    const { options, search, kinds } = setup({ mode: "rewrite" }, { rewrite: () => "две\nстроки" });
+    await expect(answerWithRag(options)).rejects.toMatchObject({ code: "REWRITE_INVALID" });
+    expect(search).not.toHaveBeenCalled();
+    expect(kinds).toEqual(["rewrite"]);
+  });
+
+  it("сбой модели при rewrite не подменяется исходным вопросом", async () => {
+    const { options, search, kinds } = setup({ mode: "rewrite-filter" }, { failOn: { kind: "rewrite", call: 1 } });
+    await expect(answerWithRag(options)).rejects.toThrow("сбой модели");
+    expect(search).not.toHaveBeenCalled();
+    expect(kinds).toEqual(["rewrite"]);
+  });
+});
+
+describe("generateAnswer", () => {
+  it("отвечает по готовым hits с исходным вопросом; принимает модель и hits, поиск ему недоступен", async () => {
+    const { model, requests } = fakeModel();
+    const result = await generateAnswer({ model, systemPrompt: "S", question: "Исходный вопрос", hits: CANDIDATES });
+    const message = renderRagMessage("Исходный вопрос", CANDIDATES);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.messages[1]?.content).toBe(message);
+    expect(result.contextChars).toBe([...message].length);
   });
 });

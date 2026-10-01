@@ -70,6 +70,77 @@ describe("конфигурация", () => {
     expect(() => resolveConfig({ "rag.inputDir": "valid" }, {}, root)).toThrow(/источник: file/);
   });
 
+  it("настройки поиска: defaults, приоритет файл < env < CLI, числа из строк", () => {
+    const defaults = resolveConfig({}, {}, root).values;
+    expect([defaults["rag.retrievalMode"], defaults["rag.candidateTopK"], defaults["rag.topK"]]).toEqual([
+      "rewrite-filter",
+      10,
+      5,
+    ]);
+    expect(defaults["rag.similarityThreshold"]).toBe(0.55);
+    writeFileSync(
+      join(root, "lab.config.yaml"),
+      "rag.retrievalMode: baseline\nrag.candidateTopK: 12\nrag.similarityThreshold: 0.6\n",
+    );
+    const file = resolveConfig({}, {}, root);
+    expect([
+      file.values["rag.retrievalMode"],
+      file.values["rag.candidateTopK"],
+      file.values["rag.similarityThreshold"],
+    ]).toEqual(["baseline", 12, 0.6]);
+    expect(file.sources["rag.candidateTopK"]).toBe("file");
+    const env = {
+      LAB_RAG_RETRIEVAL_MODE: "filter",
+      LAB_RAG_CANDIDATE_TOP_K: "8",
+      LAB_RAG_SIMILARITY_THRESHOLD: "-0.25",
+    };
+    const fromEnv = resolveConfig({}, env, root);
+    expect([
+      fromEnv.values["rag.retrievalMode"],
+      fromEnv.values["rag.candidateTopK"],
+      fromEnv.values["rag.similarityThreshold"],
+    ]).toEqual(["filter", 8, -0.25]);
+    expect(fromEnv.sources["rag.similarityThreshold"]).toBe("env");
+    const flags = { "rag.retrievalMode": "rewrite", "rag.candidateTopK": "6", "rag.similarityThreshold": "0.7" };
+    const cli = resolveConfig(flags, env, root);
+    expect([
+      cli.values["rag.retrievalMode"],
+      cli.values["rag.candidateTopK"],
+      cli.values["rag.similarityThreshold"],
+    ]).toEqual(["rewrite", 6, 0.7]);
+    expect(cli.sources["rag.retrievalMode"]).toBe("cli");
+  });
+
+  it.each([
+    ["rag.retrievalMode", "hybrid"],
+    ["rag.retrievalMode", ""],
+    ["rag.candidateTopK", "0"],
+    ["rag.candidateTopK", "21"],
+    ["rag.candidateTopK", "2.5"],
+    ["rag.topK", "1.5"],
+    ["rag.similarityThreshold", "1.01"],
+    ["rag.similarityThreshold", "-1.01"],
+    ["rag.similarityThreshold", "abc"],
+    ["rag.similarityThreshold", "Infinity"],
+  ])("отклоняет %s=%j", (key, value) => {
+    expect(() => resolveConfig({ [key]: value }, {}, root)).toThrow(
+      new RegExp(`${key.replace(".", "\\.")}.*источник: cli`),
+    );
+  });
+
+  it("принимает граничные пороги -1 и 1 и выводит флаги из ключей", () => {
+    expect(resolveConfig({ "rag.similarityThreshold": "-1" }, {}, root).values["rag.similarityThreshold"]).toBe(-1);
+    expect(resolveConfig({ "rag.similarityThreshold": "1" }, {}, root).values["rag.similarityThreshold"]).toBe(1);
+    expect(
+      parseOptions(["--rag-retrieval-mode=filter", "--rag-candidate-top-k", "12", "--rag-similarity-threshold=0.5"])
+        .flags,
+    ).toEqual({
+      "rag.retrievalMode": "filter",
+      "rag.candidateTopK": "12",
+      "rag.similarityThreshold": "0.5",
+    });
+  });
+
   it("допускает нулевое перекрытие", () => {
     expect(resolveConfig({ "rag.overlapChars": "0" }, {}, root).values["rag.overlapChars"]).toBe(0);
   });

@@ -6,8 +6,10 @@ CLI, реестры настроек и команд, tooling. MCP-фичи и �
 Реализована индексация документов (ADR 0002): корпус Markdown → чанки двумя стратегиями (fixed и structure)
 → локальные эмбеддинги Ollama → `index.json` с метаданными → отчёт сравнения стратегий (`rag index`, `rag compare`).
 И первый RAG-запрос (ADR 0003): вопрос → top-K чанков одной стратегии чанкинга (линейный косинус) → Markdown-сообщение
-→ DeepSeek; `rag ask`, режим сессии `/rag on|off`, контрольные вопросы и `rag eval`.
-Реранкинга, порога релевантности, цитат, памяти и истории нет. Задания выдаются по одному;
+→ DeepSeek; `rag ask`, режим сессии `/rag on|off`, контрольные вопросы.
+Порог и переписывание запроса (ADR 0004): четыре режима поиска (`baseline`, `filter`, `rewrite`, `rewrite-filter`),
+отбор кандидатов по cosine similarity, query rewrite через DeepSeek, `rag calibrate`, `rag eval` сравнивает четыре режима.
+Специализированного реранкинга, цитат, режима отказа, памяти и истории нет. Задания выдаются по одному;
 docs/course.md — ориентир недели, он не разрешает реализовывать будущие задания заранее.
 Перед заданием сформулируй учебную цель и минимальный результат; улучшения отдели явно.
 
@@ -18,8 +20,8 @@ docs/course.md — ориентир недели, он не разрешает �
 | apps/host/src/adapters/llm | DeepSeek через OpenAI-совместимый SDK |
 | apps/host/src/adapters/cli | Ввод, dispatch, REPL, отображение ошибок |
 | apps/host/src/app | Единственная композиция host, реестры, Markdown-инструкции |
-| apps/host/src/features/rag | Индексация и RAG-запрос: корпус, чанкинг, эмбеддинги Ollama, индекс, сравнение, поиск, ответ, контрольные вопросы |
-| experiments | Отчёты сравнений и контрольные вопросы: измерения, ручные оценки, выводы |
+| apps/host/src/features/rag | Индексация и RAG-запрос: корпус, чанкинг, эмбеддинги Ollama, индекс, сравнение, поиск, rewrite, отбор по порогу, ответ, калибровка, контрольные вопросы |
+| experiments | Отчёты сравнений и контрольные вопросы: измерения, ручные оценки, выводы (feod-chunking, feod-rag, feod-retrieval) |
 | docs/adr, docs/demos | Решения и короткие ручные демонстрации |
 | tooling | Архитектурные проверки, документация, сборка, подготовка корпуса |
 
@@ -39,11 +41,13 @@ core не импортирует SDK, Node API, адаптеры, app или ф�
 - Стратегия чанкинга: fixed — окна с перекрытием; structure — по заголовкам и целым блокам Markdown.
 - Индекс: `index.json` с документами, чанками обеих стратегий, эмбеддингами и параметрами построения.
 - Эмбеддинг: вектор чанка от модели Ollama; EmbeddingPort — порт фичи rag, не ModelPort.
-- Режим RAG: режим сессии REPL (`/rag on`, `/rag off`, старт — выключен); `rag ask` всегда отвечает с RAG.
-- Контрольный вопрос: раздел `experiments/feod-rag/questions.md` с ожиданием и файлами-источниками корпуса.
-- top-K: число ближайших чанков, которые получает модель (`rag.topK`); стратегия поиска — `rag.chunkStrategy`.
+- Режим RAG: режим сессии REPL (`/rag on`, `/rag off`, старт — выключен); `/rag on` включает настроенный конвейер, `rag ask` всегда отвечает с RAG.
+- Режим поиска (`rag.retrievalMode`): `baseline`, `filter`, `rewrite`, `rewrite-filter`; по умолчанию `rewrite-filter`.
+- Кандидаты: результат поиска до отбора (`rag.candidateTopK`); порог — `rag.similarityThreshold`, отбор оставляет `score >= порог`.
+- Контрольный вопрос: раздел `experiments/feod-retrieval/questions.md` с ожиданием и файлами-источниками корпуса; без источников — отрицательный.
+- top-K: конечный лимит чанков, которые получает модель (`rag.topK`); стратегия чанкинга — `rag.chunkStrategy`.
 - Agent: объект, обрабатывающий реплику через ModelPort. Command — команда CLI/REPL.
-- Не называй разные понятия просто strategy: в коде и документах это только стратегия чанкинга.
+- Не называй разные понятия просто strategy или mode: стратегия чанкинга — `Strategy`, режим поиска — `RetrievalMode`.
 
 ## Конфигурация и команды
 Реестр настроек: apps/host/src/app/settings.ts; описания: settings.md рядом.
@@ -57,7 +61,7 @@ process.env и process.argv читаются только в app/main.ts; дал
 ## Markdown и структура
 Инструкции модели, заметки, отчёты — Markdown; метаданные — YAML frontmatter.
 Структура допустима для API, схем, YAML-настроек и машинного состояния (`index.json`).
-Не собирай смысловой контекст через JSON.stringify. System prompt — app/system.md, инструкция режима RAG — features/rag/prompts/answer.md.
+Не собирай смысловой контекст через JSON.stringify. System prompt — app/system.md, инструкции rag — features/rag/prompts/answer.md (ответ) и rewrite.md (поисковый запрос).
 Запись файла: временный рядом + rename. Это не межфайловая транзакция. Не добавляй хранилища и миграции без задания.
 Корпус и результаты лежат в `.local/` (вне git); воспроизводимые таблицы и выводы — в experiments/.
 
@@ -86,7 +90,7 @@ dependency-cruiser проверяет границы, циклы и import type.
 ## Команды разработки
 Node 24; npm ci; npm run hooks:install; npm run dev; npm run dev -- help.
 npm run corpus:feod; npm run dev -- rag index; npm run dev -- rag compare.
-npm run dev -- rag ask "вопрос"; npm run dev -- rag eval; в REPL — /rag on и /rag off.
+npm run dev -- rag calibrate; npm run dev -- rag ask "вопрос"; npm run dev -- rag eval; в REPL — /rag on и /rag off.
 npm run lint; npm run typecheck; npm test; npm run test:coverage; npm run build.
 npm run check; npm run check:deps; npm run check:structure; npm run docs:generate.
 

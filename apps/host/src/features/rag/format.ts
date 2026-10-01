@@ -13,3 +13,16 @@ export function fence(text: string): string {
 export function tableCell(text: string): string {
   return text.replaceAll("\n", "⏎").replaceAll("|", "\\|");
 }
+
+export const seconds = (ms: number): string => (ms / 1000).toFixed(1);
+
+/** Цитата Markdown: каждая строка с `> `, пустые — `>`. */
+export function quoteBlock(text: string): string[] {
+  return text
+    .replaceAll("\r\n", "\n")
+    .split("\n")
+    .map((line) => (line ? `> ${line}` : ">"));
+}
+
+export const filesList = (files: readonly string[]): string =>
+  files.length > 0 ? files.map((file) => `\`${file}\``).join(", ") : "—";

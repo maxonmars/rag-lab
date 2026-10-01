@@ -10,5 +10,8 @@ rag.embeddingBaseUrl: http://localhost:11434
 rag.embeddingModel: bge-m3
 rag.embeddingTimeoutMs: 120000
 rag.chunkStrategy: structure
+rag.retrievalMode: rewrite-filter
+rag.candidateTopK: 10
 rag.topK: 5
-rag.questionsFile: experiments/feod-rag/questions.md
+rag.similarityThreshold: 0.55
+rag.questionsFile: experiments/feod-retrieval/questions.md

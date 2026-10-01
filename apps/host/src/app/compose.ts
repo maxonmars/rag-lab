@@ -31,6 +31,7 @@ export async function run(options: RunOptions): Promise<number> {
     config: () => showConfig(config),
     ragIndex: rag.index,
     ragCompare: rag.compare,
+    ragCalibrate: rag.calibrate,
     ragAsk: ragAnswer.ask,
     ragMode: () => ragMode,
     setRagMode: (enabled) => {
