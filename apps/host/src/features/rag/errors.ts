@@ -14,7 +14,9 @@ export type RagErrorCode =
   | "INDEX_WRITE_FAILED"
   | "INDEX_MODEL_MISMATCH"
   | "QUESTIONS_NOT_FOUND"
-  | "QUESTIONS_INVALID";
+  | "QUESTIONS_INVALID"
+  | "INVALID_RETRIEVAL_PARAMS"
+  | "REWRITE_INVALID";
 
 export class RagError extends Error {
   readonly code: RagErrorCode;
@@ -43,6 +45,18 @@ const invalidQuestions: Record<string, string> = {
   sources: "нет строки «Источники:»",
   duplicate: "идентификатор повторяется",
   source: "источник не найден в индексе",
+};
+
+const invalidRetrievalParams: Record<string, string> = {
+  candidateTopK: "rag.candidateTopK должен быть целым числом от 1 до 20.",
+  topK: "rag.topK должен быть целым числом от 1 до 20.",
+  order: "rag.topK не должен превышать rag.candidateTopK.",
+  threshold: "rag.similarityThreshold должен быть числом от -1 до 1.",
+};
+
+const invalidRewrite: Record<string, string> = {
+  multiline: "запрос занимает несколько строк",
+  fence: "запрос обёрнут в Markdown-забор",
 };
 
 function describeInvalidQuestions(data: RagError["data"]): string {
@@ -88,5 +102,9 @@ export function describeRagError(error: RagError): string {
       return "Файл контрольных вопросов не найден. Проверьте rag.questionsFile.";
     case "QUESTIONS_INVALID":
       return describeInvalidQuestions(data);
+    case "INVALID_RETRIEVAL_PARAMS":
+      return invalidRetrievalParams[String(data.reason)] ?? "Параметры поиска несовместимы.";
+    case "REWRITE_INVALID":
+      return `Модель вернула некорректный поисковый запрос: ${invalidRewrite[String(data.reason)] ?? "неизвестная причина"}.`;
   }
 }

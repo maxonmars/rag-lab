@@ -131,13 +131,15 @@ it("сравнение и ход операции: итог — в stdout, хо�
   expect(error.text).toBe("fixed: разбиение, чанков 1\nПредупреждение · Что-то пошло не так.\n");
 });
 
-it("ответ с RAG без фрагментов и итог rag eval", () => {
+it("ответ с RAG без фрагментов, итог калибровки и итог rag eval", () => {
   const output = capture();
   const view = new CliView(output, capture());
   view.ragAnswer("Ответ", []);
+  view.calibrationSaved(["Рекомендуемый порог: 0.55"], "/data/rag-calibration.md");
   view.evalSaved(["Вопросов: 10"], "/data/rag-eval.md");
   expect(output.text).toBe(
-    "\n── Ответ агента · RAG ──\n\nОтвет\n\nФрагменты: не найдены\n" +
+    "\n── Ответ агента · RAG ──\n\nОтвет\n\nФрагменты: контекст пуст\n" +
+      "\n── Калибровка порога ──\n\nРекомендуемый порог: 0.55\n\nСохранено: /data/rag-calibration.md\n" +
       "\n── Контрольные вопросы ──\n\nВопросов: 10\n\nСохранено: /data/rag-eval.md\n",
   );
 });

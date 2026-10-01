@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { RagError } from "./errors.ts";
+import type { SearchHit } from "./search.ts";
 
 export type ControlQuestion = Readonly<{
   id: string;
@@ -20,7 +21,7 @@ function fieldValue(lines: readonly string[], label: string): string | undefined
 
 function parseSources(value: string): string[] {
   if (NO_SOURCES.has(value)) return [];
-  return value
+  const files = value
     .split(",")
     .map((item) =>
       item
@@ -29,6 +30,7 @@ function parseSources(value: string): string[] {
         .trim(),
     )
     .filter(Boolean);
+  return [...new Set(files)];
 }
 
 function parseSection(section: string): ControlQuestion {
@@ -64,4 +66,18 @@ export function loadQuestions(path: string): ControlQuestion[] {
     throw new RagError("QUESTIONS_NOT_FOUND");
   }
   return parseQuestions(text);
+}
+
+/** Источник, которого нет в индексе, отклоняется до первого обращения к поиску и модели. */
+export function requireIndexedSources(questions: readonly ControlQuestion[], files: readonly string[]): void {
+  for (const { id, sources } of questions) {
+    const missing = sources.find((file) => !files.includes(file));
+    if (missing !== undefined) throw new RagError("QUESTIONS_INVALID", { reason: "source", id, file: missing });
+  }
+}
+
+/** Ожидаемые файлы, встретившиеся в hits; каждый файл считается один раз, сколько бы чанков ни нашлось. */
+export function foundSources(question: ControlQuestion, hits: readonly SearchHit[]): string[] {
+  const files = new Set(hits.map((hit) => hit.chunk.file));
+  return question.sources.filter((file) => files.has(file));
 }

@@ -1,96 +1,117 @@
-import type { RagAnswer } from "./answer.ts";
+import type { ModelPort } from "../../core/index.ts";
+import { generateAnswer } from "./answer.ts";
 import { writeFileAtomic } from "./atomicWrite.ts";
-import { RagError } from "./errors.ts";
-import { type QuestionResult, renderEvalReport } from "./evalReport.ts";
-import { type ControlQuestion, loadQuestions } from "./questions.ts";
-import type { SearchIndex } from "./search.ts";
+import { allModeMetrics, type ModeMetrics, type ModeOutcome, type QuestionResult } from "./evalMetrics.ts";
+import { renderEvalReport } from "./evalReport.ts";
+import { type ControlQuestion, loadQuestions, requireIndexedSources } from "./questions.ts";
+import { checkRetrievalParams, type RetrievalMode, type RetrievalParams } from "./retrieval.ts";
+import { rewriteQuery } from "./rewrite.ts";
+import type { SearchHit, SearchIndex } from "./search.ts";
+import { selectForMode } from "./select.ts";
+import { timed, timedSync } from "./timing.ts";
 import type { Strategy } from "./types.ts";
 
-export type EvalProgress = Readonly<{ id: string; mode: "plain" | "rag" }>;
+export type EvalStep = "search" | "query-rewrite" | RetrievalMode;
+export type EvalProgress = Readonly<{ id: string; step: EvalStep }>;
 
-export type EvalOptions = Readonly<{
-  questionsFile: string;
-  reportFile: string;
-  index: SearchIndex;
-  strategy: Strategy;
-  topK: number;
-  /** Значения только для шапки отчёта. */
-  meta: Readonly<{ questionsFile: string; llmModel: string }>;
-  askPlain: (question: string) => Promise<string>;
-  askRag: (question: string) => Promise<RagAnswer>;
-  onProgress?: (event: EvalProgress) => void;
-  now?: () => Date;
-}>;
+export type EvalOptions = RetrievalParams &
+  Readonly<{
+    questionsFile: string;
+    reportFile: string;
+    index: SearchIndex;
+    strategy: Strategy;
+    model: ModelPort;
+    systemPrompt: string;
+    /** Значения только для шапки отчёта. */
+    meta: Readonly<{ questionsFile: string; llmModel: string }>;
+    onProgress?: (event: EvalProgress) => void;
+    now?: () => Date;
+  }>;
 
 export type EvalResult = Readonly<{
   path: string;
   questions: number;
-  expectedSources: number;
-  foundSources: number;
-  plainMs: number;
-  ragMs: number;
+  /** Фактическая длительность прогона вопросов, мс; не равна сумме времён режимов. */
+  wallMs: number;
+  metrics: Readonly<Record<RetrievalMode, ModeMetrics>>;
 }>;
 
-function requireKnownSources(questions: readonly ControlQuestion[], files: readonly string[]): void {
-  for (const { id, sources } of questions) {
-    const missing = sources.find((file) => !files.includes(file));
-    if (missing !== undefined) throw new RagError("QUESTIONS_INVALID", { reason: "source", id, file: missing });
-  }
+type Retrieved = Readonly<{ query: string; candidates: readonly SearchHit[]; rewriteMs: number; searchMs: number }>;
+
+async function retrieve(options: EvalOptions, query: string, rewriteMs: number): Promise<Retrieved> {
+  const search = await timed(() => options.index.search(query, options.strategy, options.candidateTopK));
+  return { query, candidates: search.value, rewriteMs, searchMs: search.ms };
 }
 
-async function timed<T>(run: () => Promise<T>): Promise<{ value: T; ms: number }> {
-  const started = performance.now();
-  const value = await run();
-  return { value, ms: performance.now() - started };
-}
-
-async function evaluateOne(question: ControlQuestion, options: EvalOptions): Promise<QuestionResult> {
-  options.onProgress?.({ id: question.id, mode: "plain" });
-  const plain = await timed(() => options.askPlain(question.question));
-  options.onProgress?.({ id: question.id, mode: "rag" });
-  const rag = await timed(() => options.askRag(question.question));
-  const { hits } = rag.value;
-  const hitFiles = new Set(hits.map((hit) => hit.chunk.file));
+async function answerMode(
+  options: EvalOptions,
+  question: ControlQuestion,
+  mode: RetrievalMode,
+  retrieved: Retrieved,
+): Promise<ModeOutcome> {
+  options.onProgress?.({ id: question.id, step: mode });
+  const selection = timedSync(() => selectForMode(mode, retrieved.candidates, options));
+  const { hits } = selection.value;
+  const generation = await timed(() =>
+    generateAnswer({ model: options.model, systemPrompt: options.systemPrompt, question: question.question, hits }),
+  );
   return {
-    question,
-    hits,
-    found: question.sources.filter((file) => hitFiles.has(file)),
-    firstRank: hits.find((hit) => question.sources.includes(hit.chunk.file))?.rank ?? null,
-    contextChars: rag.value.contextChars,
-    plainAnswer: plain.value,
-    ragAnswer: rag.value.answer,
-    plainMs: plain.ms,
-    ragMs: rag.ms,
+    query: retrieved.query,
+    candidates: retrieved.candidates,
+    selection: selection.value,
+    answer: generation.value.answer,
+    contextChars: generation.value.contextChars,
+    timings: {
+      rewriteMs: retrieved.rewriteMs,
+      searchMs: retrieved.searchMs,
+      selectMs: selection.ms,
+      generateMs: generation.ms,
+    },
   };
 }
 
-const sum = (values: readonly number[]): number => values.reduce((total, value) => total + value, 0);
+/** Исходный поиск → baseline, filter; один rewrite и один поиск → rewrite, rewrite-filter. Исходный вопрос идёт во все четыре ответа. */
+async function evaluateOne(question: ControlQuestion, options: EvalOptions): Promise<QuestionResult> {
+  options.onProgress?.({ id: question.id, step: "search" });
+  const original = await retrieve(options, question.question, 0);
+  const baseline = await answerMode(options, question, "baseline", original);
+  const filter = await answerMode(options, question, "filter", original);
+  options.onProgress?.({ id: question.id, step: "query-rewrite" });
+  const rewritten = await timed(() => rewriteQuery(question.question, options.model));
+  const retrieved = await retrieve(options, rewritten.value, rewritten.ms);
+  const rewrite = await answerMode(options, question, "rewrite", retrieved);
+  const rewriteFilter = await answerMode(options, question, "rewrite-filter", retrieved);
+  return {
+    question,
+    rewrittenQuery: rewritten.value,
+    outcomes: { baseline, filter, rewrite, "rewrite-filter": rewriteFilter },
+  };
+}
 
 /** Вопросы идут последовательно; первая ошибка прерывает прогон, и отчёт не пишется. */
 export async function evaluateQuestions(options: EvalOptions): Promise<EvalResult> {
+  checkRetrievalParams(options);
   const questions = loadQuestions(options.questionsFile);
-  requireKnownSources(questions, options.index.files);
+  requireIndexedSources(questions, options.index.files);
   const now = (options.now ?? (() => new Date()))();
+  const started = performance.now();
   const results: QuestionResult[] = [];
   for (const question of questions) results.push(await evaluateOne(question, options));
+  const wallMs = performance.now() - started;
+  const metrics = allModeMetrics(results);
   await writeFileAtomic(
     options.reportFile,
     renderEvalReport({
       now,
       index: options.index,
       strategy: options.strategy,
-      topK: options.topK,
+      params: options,
       questionsFile: options.meta.questionsFile,
       llmModel: options.meta.llmModel,
+      wallMs,
       results,
+      metrics,
     }),
   );
-  return {
-    path: options.reportFile,
-    questions: results.length,
-    expectedSources: sum(results.map((result) => result.question.sources.length)),
-    foundSources: sum(results.map((result) => result.found.length)),
-    plainMs: sum(results.map((result) => result.plainMs)),
-    ragMs: sum(results.map((result) => result.ragMs)),
-  };
+  return { path: options.reportFile, questions: results.length, wallMs, metrics };
 }

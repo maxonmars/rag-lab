@@ -14,6 +14,7 @@ type CommandContext = {
   ragAsk: (text: string) => Promise<RagReply>;
   ragMode: () => boolean;
   setRagMode: (enabled: boolean) => readonly string[];
+  ragCalibrate: () => Promise<RagOutcome>;
   ragEval: () => Promise<RagOutcome>;
   view: CommandView;
 };
@@ -37,6 +38,16 @@ function ragIndexCommands(context: CommandContext): Command[] {
       run: async () => {
         const outcome = await context.ragCompare();
         context.view.comparisonSaved(outcome.lines, outcome.path);
+        return "continue";
+      },
+    },
+    {
+      name: "rag calibrate",
+      arguments: [],
+      description: descriptions["rag calibrate"] ?? "",
+      run: async () => {
+        const outcome = await context.ragCalibrate();
+        context.view.calibrationSaved(outcome.lines, outcome.path);
         return "continue";
       },
     },

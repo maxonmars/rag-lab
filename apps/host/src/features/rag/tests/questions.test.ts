@@ -3,7 +3,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { RagError } from "../errors.ts";
-import { loadQuestions, parseQuestions } from "../questions.ts";
+import { foundSources, loadQuestions, parseQuestions, requireIndexedSources } from "../questions.ts";
+import { searchHit } from "./support.ts";
 
 const VALID = [
   "# Контрольные вопросы",
@@ -44,6 +45,11 @@ describe("parseQuestions", () => {
     expect(parseQuestions(text).map((item) => item.sources)).toEqual([["a.md", "b/c.md"], []]);
   });
 
+  it("повторяющийся источник считается один раз", () => {
+    const [first] = parseQuestions("## q01. В\nОжидание: x\nИсточники: a.md, `a.md`, b.md");
+    expect(first?.sources).toEqual(["a.md", "b.md"]);
+  });
+
   it("сообщает причину: нет разделов", () => {
     expect(reasonOf("# Только шапка\n\nтекст")).toEqual({ reason: "empty" });
   });
@@ -79,5 +85,23 @@ describe("loadQuestions", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  });
+});
+
+describe("foundSources", () => {
+  const question = { id: "q01", question: "В", expectation: "x", sources: ["a.md", "b.md"] };
+  it("каждый ожидаемый файл считается один раз, сколько бы чанков ни нашлось", () => {
+    const hits = [searchHit(1, "a.md", 0.9), searchHit(2, "a.md", 0.8), searchHit(3, "x.md", 0.7)];
+    expect(foundSources(question, hits)).toEqual(["a.md"]);
+  });
+});
+
+describe("requireIndexedSources", () => {
+  const questions = parseQuestions("## q01. В\nОжидание: x\nИсточники: a.md, нет.md");
+  it("называет вопрос и файл, которых нет в индексе", () => {
+    expect(() => requireIndexedSources(questions, ["a.md"])).toThrowError(
+      expect.objectContaining({ code: "QUESTIONS_INVALID", data: { reason: "source", id: "q01", file: "нет.md" } }),
+    );
+    expect(() => requireIndexedSources(questions, ["a.md", "нет.md"])).not.toThrow();
   });
 });

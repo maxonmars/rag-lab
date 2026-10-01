@@ -1,9 +1,12 @@
 import { createHash } from "node:crypto";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { vi } from "vitest";
+import type { ModelPort, ModelRequest } from "../../../core/index.ts";
 import type { LoadedDocument } from "../corpus.ts";
 import type { EmbedBatch, EmbeddingPort } from "../embeddings.ts";
 import { parseBlocks } from "../markdown.ts";
+import type { SearchHit, SearchIndex } from "../search.ts";
 import { CodePointText, sha256 } from "../text.ts";
 import type { ChunkParams } from "../types.ts";
 
@@ -59,4 +62,64 @@ export function writeCorpus(root: string, files: Readonly<Record<string, string>
 export function documentOf(text: string, file = "doc.md", title = "Doc"): LoadedDocument {
   const content = new CodePointText(text);
   return { file, source: `src/${file}`, title, hash: sha256(text), content, blocks: parseBlocks(content).blocks };
+}
+
+export function searchHit(rank: number, file: string, score: number): SearchHit {
+  return {
+    rank,
+    score,
+    chunk: {
+      chunk_id: `${file}#${rank}`,
+      strategy: "structure",
+      source: "src",
+      title: "Doc",
+      file,
+      sections: [`Doc › ${file}`],
+      start: 0,
+      end: 1,
+      text: `текст ${file}`,
+    },
+  };
+}
+
+/** Индекс без диска: `search` возвращает кандидатов по тексту запроса и записывается как mock. */
+export function fakeSearchIndex(
+  results: (query: string) => readonly SearchHit[],
+  files: readonly string[] = ["a.md", "b.md", "c.md"],
+) {
+  const search = vi.fn(async (query: string) => results(query));
+  const index: SearchIndex = {
+    createdAt: "2026-09-29T10:00:00.000Z",
+    model: { name: "bge-m3:latest", digest: "790764642607abcdef", dimension: 2 },
+    files,
+    search,
+  };
+  return { index, search };
+}
+
+export type FakeModelOptions = Readonly<{
+  rewrite?: (question: string) => string;
+  /** Номер вызова этого вида (с 1), который завершится ошибкой. */
+  failOn?: Readonly<{ kind: "rewrite" | "answer"; call: number }>;
+  onCall?: (kind: "rewrite" | "answer") => void;
+}>;
+
+/** Модель различает запросы по системной инструкции: rewrite — «переписываешь», иначе ответ по фрагментам. */
+export function fakeModel(options: FakeModelOptions = {}) {
+  const requests: ModelRequest[] = [];
+  const kinds: ("rewrite" | "answer")[] = [];
+  const model: ModelPort = {
+    async complete(request) {
+      requests.push(request);
+      const kind = String(request.messages[0]?.content).includes("переписываешь") ? "rewrite" : "answer";
+      kinds.push(kind);
+      options.onCall?.(kind);
+      const call = kinds.filter((item) => item === kind).length;
+      if (options.failOn?.kind === kind && options.failOn.call === call) throw new Error("сбой модели");
+      const user = String(request.messages[1]?.content);
+      const rewrite = options.rewrite ?? ((question: string) => `запрос: ${question}`);
+      return { type: "text", content: kind === "rewrite" ? rewrite(user) : `ответ: ${user.slice(-30)}` };
+    },
+  };
+  return { model, requests, kinds };
 }

@@ -4,7 +4,7 @@
 
 Исполняемый workspace `apps/host`. Общих библиотек и серверов нет. `app/main.ts` принимает окружение, argv и потоки;
 `app/compose.ts` собирает приложение. Модель DeepSeek создаётся лениво при первом `ask`, `rag ask` или `rag eval`, поэтому
-справка, настройки, `rag index` и `rag compare` работают без ключа.
+справка, настройки, `rag index`, `rag compare` и `rag calibrate` работают без ключа.
 
 ```mermaid
 flowchart LR
@@ -20,6 +20,7 @@ flowchart LR
     Rag --> Corpus[(.local/rag/corpus)]
     Rag --> Index[(.local/rag/index.json)]
     Rag --> Report[(.local/rag/comparison.md)]
+    Rag --> Calibration[(.local/rag/rag-calibration.md)]
     Rag --> EvalReport[(.local/rag/rag-eval.md)]
 ```
 
@@ -56,18 +57,29 @@ Ollama лежит внутри фичи, потому что не нужен н�
 Оба режима берут один `app/system.md`; режим RAG добавляет `features/rag/prompts/answer.md` и фрагменты в сообщение
 пользователя, поэтому единственное отличие режимов — найденный контекст.
 
-`answerWithRag` (фича импортирует `Agent` и `AgentError` из публичного входа ядра, `features → core`):
+`answerWithRag` (фича импортирует `Agent` и `AgentError` из публичного входа ядра, `features → core`) собирает независимые
+операции:
 
 1. `openIndex` читает `index.json` один раз и сверяет digest модели эмбеддингов с индексом (`INDEX_MODEL_MISMATCH`).
-2. `EmbeddingPort.embed` получает один текст — вопрос; линейный перебор по косинусной близости даёт top-K чанков
-   стратегии из `rag.chunkStrategy`.
-3. `renderRagMessage` собирает Markdown: фрагменты с файлом, документом и разделами, затем вопрос.
-4. `Agent(system.md + answer.md).respond(сообщение)` — история между вызовами не накапливается.
+   `SearchIndex.search` остаётся низкоуровневым: эмбеддинг одного текста и линейный перебор по косинусной близости.
+2. Rewrite (режимы `rewrite`, `rewrite-filter`): один вызов `Agent` с `prompts/rewrite.md` даёт одну строку запроса.
+   Поиск возвращает `rag.candidateTopK` кандидатов стратегии `rag.chunkStrategy` по этой строке или по исходному вопросу.
+3. Отбор — чистая функция над готовым списком: при фильтре `score >= rag.similarityThreshold`, затем первые `rag.topK`.
+   Порядок и score не меняются, это не реранкинг.
+4. Генерация по готовым hits: `renderRagMessage` собирает Markdown с фрагментами и **исходным** вопросом,
+   `Agent(system.md + answer.md).respond(сообщение)` — история между вызовами не накапливается. Пустой список hits модель не
+   останавливает.
+
+Параметры (`candidateTopK`, `topK`, порог) проверяет одна функция `checkRetrievalParams` до любых внешних вызовов.
+`rag calibrate` использует только поиск и `EmbeddingPort`: один поиск на вопрос, четыре порога на общих кандидатах.
+`rag eval` не вызывает `answerWithRag` четыре раза: на вопрос — исходный поиск (baseline, filter), один rewrite и один
+поиск переписанной строки (rewrite, rewrite-filter), четыре генерации на общих кандидатах. Отчёты `rag-calibration.md` и
+`rag-eval.md` пишутся один раз после успеха.
 
 App создаёт новый `SearchIndex` на каждый `rag ask` (свежий индекс после `rag index` в той же сессии) и один на весь
-`rag eval`. `rag eval` читает контрольные вопросы (`experiments/feod-rag/questions.md`), для каждого вызывает оба режима
-последовательно и пишет `rag-eval.md`: найденные фрагменты, попадание ожидаемых файлов, ответы. Оценки качества в отчёт
-не входят — их пишет автор в `experiments/feod-rag/README.md`. Решение — [ADR 0003](docs/adr/0003-first-rag-query.md).
+`rag eval` и `rag calibrate`. Контрольные вопросы — `experiments/feod-retrieval/questions.md`; оценки качества в отчёты не
+входят, их пишет автор в README эксперимента. Решения — [ADR 0003](docs/adr/0003-first-rag-query.md) и
+[ADR 0004](docs/adr/0004-relevance-filter-and-query-rewrite.md).
 
 ## Границы и рост
 
@@ -89,7 +101,7 @@ App создаёт новый `SearchIndex` на каждый `rag ask` (све�
 отклоняется, даже если перекрыт следующим. YAML использует плоские ключи с точками. Путь `config.file`
 выбирается до чтения YAML. Справка и docs/configuration.md, docs/commands.md генерируются из реестров.
 Перекрёстные ограничения (`rag.overlapChars` < `rag.chunkSizeChars`, `rag.minChunkChars` ≤ `rag.chunkSizeChars`)
-проверяет `indexCorpus`, потому что реестр проверяет каждый ключ отдельно.
+проверяет `indexCorpus`, а `rag.topK` ≤ `rag.candidateTopK` — `checkRetrievalParams`, потому что реестр проверяет каждый ключ отдельно.
 
 ## Проверки
 
