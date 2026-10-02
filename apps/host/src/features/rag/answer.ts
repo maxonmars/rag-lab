@@ -1,10 +1,17 @@
 import { Agent, AgentError, type ModelPort } from "../../core/index.ts";
+import { type CitedAnswer, parseCitedAnswer, retrievalRefusal } from "./citations.ts";
 import { renderRagMessage } from "./context.ts";
 import { readPrompt } from "./prompts.ts";
-import { checkRetrievalParams, type RetrievalMode, type RetrievalParams, usesRewrite } from "./retrieval.ts";
+import {
+  checkRetrievalParams,
+  type RetrievalMode,
+  type RetrievalParams,
+  usesFilter,
+  usesRewrite,
+} from "./retrieval.ts";
 import { rewriteQuery } from "./rewrite.ts";
 import type { SearchHit, SearchIndex } from "./search.ts";
-import { selectForMode } from "./select.ts";
+import { type Selection, selectForMode } from "./select.ts";
 import { timed, timedSync } from "./timing.ts";
 import type { Strategy } from "./types.ts";
 
@@ -12,7 +19,7 @@ import type { Strategy } from "./types.ts";
 export type StageTimings = Readonly<{ rewriteMs: number; searchMs: number; selectMs: number; generateMs: number }>;
 
 export type RagAnswer = Readonly<{
-  answer: string;
+  answer: CitedAnswer;
   hits: readonly SearchHit[];
   contextChars: number;
   /** Строка, по которой выполнен поиск: исходный вопрос или результат rewrite. */
@@ -35,20 +42,27 @@ export type GenerationOptions = Readonly<{
   model: ModelPort;
   systemPrompt: string;
   question: string;
-  hits: readonly SearchHit[];
+  selection: Selection;
+  /** Порог режима с фильтром; `null` — режим без порога. */
+  threshold: number | null;
 }>;
 
-/** Ответ по готовым hits: поиск и rewrite не выполняются, вопрос остаётся исходным; `contextChars` — кодовые точки сообщения. */
+/**
+ * Ответ по готовому отбору: поиск и rewrite не выполняются, вопрос остаётся исходным.
+ * При пустом `selection.hits` модель не вызывается, `contextChars` равен 0; иначе это кодовые точки сообщения.
+ */
 export async function generateAnswer(
   options: GenerationOptions,
-): Promise<Readonly<{ answer: string; contextChars: number }>> {
-  const message = renderRagMessage(options.question, options.hits);
+): Promise<Readonly<{ answer: CitedAnswer; contextChars: number }>> {
+  const { hits } = options.selection;
+  if (hits.length === 0) return { answer: retrievalRefusal(options.selection, options.threshold), contextChars: 0 };
+  const message = renderRagMessage(options.question, hits);
   const instruction = readPrompt("answer.md");
-  const answer = await new Agent(options.model, `${options.systemPrompt}\n\n${instruction}`).respond(message);
-  return { answer, contextChars: [...message].length };
+  const raw = await new Agent(options.model, `${options.systemPrompt}\n\n${instruction}`).respond(message);
+  return { answer: parseCitedAnswer(raw, hits), contextChars: [...message].length };
 }
 
-/** Rewrite (по режиму) → поиск кандидатов → отбор → генерация; системная инструкция — та же, что без RAG, плюс prompts/answer.md. */
+/** Rewrite (по режиму) → поиск кандидатов → отбор → генерация (при пустом отборе — отказ без модели); системная инструкция — та же, что без RAG, плюс prompts/answer.md. */
 export async function answerWithRag(options: RagAnswerOptions): Promise<RagAnswer> {
   const question = options.question.trim();
   if (!question) throw new AgentError("EMPTY_INPUT");
@@ -60,7 +74,13 @@ export async function answerWithRag(options: RagAnswerOptions): Promise<RagAnswe
   const selection = timedSync(() => selectForMode(options.mode, search.value, options));
   const { hits } = selection.value;
   const generation = await timed(() =>
-    generateAnswer({ model: options.model, systemPrompt: options.systemPrompt, question, hits }),
+    generateAnswer({
+      model: options.model,
+      systemPrompt: options.systemPrompt,
+      question,
+      selection: selection.value,
+      threshold: usesFilter(options.mode) ? options.threshold : null,
+    }),
   );
   return {
     answer: generation.value.answer,

@@ -18,8 +18,6 @@ function scriptedModel(): CompleteMock {
 
 const fragments = (output: string) => output.match(/^ {2}\d+\. .*$/gm) ?? [];
 const scoreOf = (line: string) => /· (-?\d\.\d\d)/.exec(line)?.[1];
-const userMessage = (complete: CompleteMock, call: number) =>
-  String(complete.mock.calls[call]?.[0].messages[1]?.content);
 
 let cwd: string;
 beforeEach(async () => {
@@ -50,7 +48,7 @@ describe("режимы поиска в rag ask", () => {
 
   it.each([
     ["baseline", 1],
-    ["filter", 1],
+    ["filter", 0],
     ["rewrite", 2],
     ["rewrite-filter", 2],
   ])("--rag-retrieval-mode=%s вызывает модель %i раз(а)", async (mode, calls) => {
@@ -62,7 +60,11 @@ describe("режимы поиска в rag ask", () => {
     });
     expect(result.code).toBe(0);
     expect(complete).toHaveBeenCalledTimes(calls);
-    expect(userMessage(complete, calls - 1).endsWith("## Вопрос\n\nВопрос")).toBe(true);
+    const answers = complete.mock.calls.filter(
+      ([request]) => !String(request.messages[0]?.content).includes("переписываешь"),
+    );
+    for (const [request] of answers)
+      expect(String(request.messages[1]?.content).endsWith("## Вопрос\n\nВопрос")).toBe(true);
   });
 
   it("baseline и rewrite не применяют порог, filter и rewrite-filter применяют", async () => {
@@ -88,7 +90,7 @@ describe("режимы поиска в rag ask", () => {
     expect(rewriteFilter.every((line) => line.includes("a.md") && scoreOf(line) === "1.00")).toBe(true);
   });
 
-  it("пустой итоговый контекст: модель отвечает по исходному вопросу, CLI пишет «контекст пуст»", async () => {
+  it("пустой итоговый контекст: модель не вызывается, CLI пишет «не знаю» по порогу и «контекст пуст»", async () => {
     const complete = scriptedModel();
     const result = await invoke(["--rag-retrieval-mode=filter", "rag", "ask", "Вопрос"], {
       cwd,
@@ -96,12 +98,9 @@ describe("режимы поиска в rag ask", () => {
       complete,
     });
     expect(result.code).toBe(0);
-    expect(result.output).toContain("ответ модели");
+    expect(result.output).toContain("Не знаю: ни один фрагмент не достиг порога сходства 0.55");
     expect(result.output).toContain("Фрагменты: контекст пуст");
-    expect(result.output).not.toContain("не найден");
-    expect(complete).toHaveBeenCalledTimes(1);
-    expect(userMessage(complete, 0)).toBe("## Фрагменты документации\n\n## Вопрос\n\nВопрос");
-    expect(String(complete.mock.calls[0]?.[0].messages[0]?.content)).toContain("фрагменты документации");
+    expect(complete).not.toHaveBeenCalled();
   });
 
   it("ошибка формата rewrite показывается по-русски: поиск и ответ не выполняются", async () => {

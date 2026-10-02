@@ -64,7 +64,7 @@ export function documentOf(text: string, file = "doc.md", title = "Doc"): Loaded
   return { file, source: `src/${file}`, title, hash: sha256(text), content, blocks: parseBlocks(content).blocks };
 }
 
-export function searchHit(rank: number, file: string, score: number): SearchHit {
+export function searchHit(rank: number, file: string, score: number, text = `текст ${file}`): SearchHit {
   return {
     rank,
     score,
@@ -77,7 +77,7 @@ export function searchHit(rank: number, file: string, score: number): SearchHit 
       sections: [`Doc › ${file}`],
       start: 0,
       end: 1,
-      text: `текст ${file}`,
+      text,
     },
   };
 }
@@ -99,6 +99,7 @@ export function fakeSearchIndex(
 
 export type FakeModelOptions = Readonly<{
   rewrite?: (question: string) => string;
+  answer?: (user: string) => string;
   /** Номер вызова этого вида (с 1), который завершится ошибкой. */
   failOn?: Readonly<{ kind: "rewrite" | "answer"; call: number }>;
   onCall?: (kind: "rewrite" | "answer") => void;
@@ -118,7 +119,8 @@ export function fakeModel(options: FakeModelOptions = {}) {
       if (options.failOn?.kind === kind && options.failOn.call === call) throw new Error("сбой модели");
       const user = String(request.messages[1]?.content);
       const rewrite = options.rewrite ?? ((question: string) => `запрос: ${question}`);
-      return { type: "text", content: kind === "rewrite" ? rewrite(user) : `ответ: ${user.slice(-30)}` };
+      const answer = options.answer ?? ((text: string) => `ответ: ${text.slice(-30)}`);
+      return { type: "text", content: kind === "rewrite" ? rewrite(user) : answer(user) };
     },
   };
   return { model, requests, kinds };

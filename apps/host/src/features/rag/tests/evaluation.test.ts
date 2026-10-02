@@ -75,14 +75,20 @@ describe("evaluateQuestions: контекст режимов", () => {
     expect(files(3)).toEqual(["- Файл: `a.md`", "- Файл: `b.md`"]);
   });
 
-  it("пустой контекст не пропускает ответ: модель вызывается во всех режимах", async () => {
+  it("пустой контекст после отбора: в filter и rewrite-filter модель не вызывается", async () => {
     const { options, requests, kinds } = setupEval(root.path, { threshold: 0.95 });
-    await evaluateQuestions(options);
-    expect(kinds.filter((kind) => kind === "answer")).toHaveLength(12);
-    const empty = requests.filter(
-      (request) => request.messages[1]?.content === "## Фрагменты документации\n\n## Вопрос\n\nЧто в первом файле?",
+    const result = await evaluateQuestions(options);
+    expect(kinds.filter((kind) => kind === "answer")).toHaveLength(6);
+    expect(kinds.filter((kind) => kind === "rewrite")).toHaveLength(3);
+    expect(
+      requests.filter((request) =>
+        String(request.messages[1]?.content).startsWith("## Фрагменты документации\n\n## Вопрос"),
+      ),
+    ).toHaveLength(0);
+    const refusals = readFileSync(result.path, "utf8").match(
+      /Не знаю: ни один фрагмент не достиг порога сходства 0\.95/g,
     );
-    expect(empty).toHaveLength(2);
+    expect(refusals).toHaveLength(6);
   });
 });
 

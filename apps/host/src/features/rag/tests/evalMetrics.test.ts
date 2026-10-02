@@ -13,7 +13,7 @@ function outcome(hits: readonly SearchHit[], contextChars: number, generateMs = 
     query: "q",
     candidates: hits,
     selection: { hits, belowThreshold: [], overLimit: [] },
-    answer: "ответ",
+    answer: { kind: "unknown", by: "retrieval", threshold: null, nearest: [] },
     contextChars,
     timings: { rewriteMs: 1, searchMs: 2, selectMs: 3, generateMs },
   };

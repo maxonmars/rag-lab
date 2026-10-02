@@ -1,5 +1,14 @@
 export { answerWithRag, type RagAnswer, type StageTimings } from "./answer.ts";
 export { type CalibrationOptions, type CalibrationResult, calibrateThreshold } from "./calibration.ts";
+export {
+  type CitationEvalOptions,
+  type CitationEvalResult,
+  type CitationProgress,
+  evaluateCitations,
+} from "./citationEval.ts";
+export type { CitationMetrics } from "./citationMetrics.ts";
+export { describeCitationProblem, renderCitedAnswer } from "./citationRender.ts";
+export type { CitationProblem, CitedAnswer } from "./citations.ts";
 export { type CompareOptions, type CompareResult, compareIndex } from "./compare.ts";
 export { EMBED_BATCH_SIZE, type EmbedBatch, type EmbeddingPort, type ModelInfo } from "./embeddings.ts";
 export { describeRagError, RagError, type RagErrorCode } from "./errors.ts";

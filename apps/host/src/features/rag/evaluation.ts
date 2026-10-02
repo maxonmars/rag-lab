@@ -4,7 +4,7 @@ import { writeFileAtomic } from "./atomicWrite.ts";
 import { allModeMetrics, type ModeMetrics, type ModeOutcome, type QuestionResult } from "./evalMetrics.ts";
 import { renderEvalReport } from "./evalReport.ts";
 import { type ControlQuestion, loadQuestions, requireIndexedSources } from "./questions.ts";
-import { checkRetrievalParams, type RetrievalMode, type RetrievalParams } from "./retrieval.ts";
+import { checkRetrievalParams, type RetrievalMode, type RetrievalParams, usesFilter } from "./retrieval.ts";
 import { rewriteQuery } from "./rewrite.ts";
 import type { SearchHit, SearchIndex } from "./search.ts";
 import { selectForMode } from "./select.ts";
@@ -51,9 +51,14 @@ async function answerMode(
 ): Promise<ModeOutcome> {
   options.onProgress?.({ id: question.id, step: mode });
   const selection = timedSync(() => selectForMode(mode, retrieved.candidates, options));
-  const { hits } = selection.value;
   const generation = await timed(() =>
-    generateAnswer({ model: options.model, systemPrompt: options.systemPrompt, question: question.question, hits }),
+    generateAnswer({
+      model: options.model,
+      systemPrompt: options.systemPrompt,
+      question: question.question,
+      selection: selection.value,
+      threshold: usesFilter(mode) ? options.threshold : null,
+    }),
   );
   return {
     query: retrieved.query,

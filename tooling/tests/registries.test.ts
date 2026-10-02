@@ -28,6 +28,7 @@ it("команды имеют уникальные имена и алиасы, �
     ragMode: () => false,
     setRagMode: () => [],
     ragEval: async () => ({ lines: [], path: "" }),
+    ragCitations: async () => ({ lines: [], path: "" }),
     view: {
       answer: () => {},
       help: () => {},

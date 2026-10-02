@@ -9,7 +9,9 @@ CLI, реестры настроек и команд, tooling. MCP-фичи и �
 → DeepSeek; `rag ask`, режим сессии `/rag on|off`, контрольные вопросы.
 Порог и переписывание запроса (ADR 0004): четыре режима поиска (`baseline`, `filter`, `rewrite`, `rewrite-filter`),
 отбор кандидатов по cosine similarity, query rewrite через DeepSeek, `rag calibrate`, `rag eval` сравнивает четыре режима.
-Специализированного реранкинга, цитат, режима отказа, памяти и истории нет. Задания выдаются по одному;
+Источники, цитаты и «не знаю» (ADR 0005): ответ в Markdown-разделах, `[N]` раскрывается в чанк, цитаты проверяются на
+дословность, пустой отбор даёт «не знаю» без вызова модели; `rag citations` пишет отчёт `rag-citations.md`.
+Специализированного реранкинга, памяти и истории нет. Задания выдаются по одному;
 docs/course.md — ориентир недели, он не разрешает реализовывать будущие задания заранее.
 Перед заданием сформулируй учебную цель и минимальный результат; улучшения отдели явно.
 
@@ -20,8 +22,8 @@ docs/course.md — ориентир недели, он не разрешает �
 | apps/host/src/adapters/llm | DeepSeek через OpenAI-совместимый SDK |
 | apps/host/src/adapters/cli | Ввод, dispatch, REPL, отображение ошибок |
 | apps/host/src/app | Единственная композиция host, реестры, Markdown-инструкции |
-| apps/host/src/features/rag | Индексация и RAG-запрос: корпус, чанкинг, эмбеддинги Ollama, индекс, сравнение, поиск, rewrite, отбор по порогу, ответ, калибровка, контрольные вопросы |
-| experiments | Отчёты сравнений и контрольные вопросы: измерения, ручные оценки, выводы (feod-chunking, feod-rag, feod-retrieval) |
+| apps/host/src/features/rag | Индексация и RAG-запрос: корпус, чанкинг, эмбеддинги Ollama, индекс, сравнение, поиск, rewrite, отбор по порогу, ответ, цитаты и режим «не знаю», калибровка, контрольные вопросы |
+| experiments | Отчёты сравнений и контрольные вопросы: измерения, ручные оценки, выводы (feod-chunking, feod-rag, feod-retrieval, feod-citations) |
 | docs/adr, docs/demos | Решения и короткие ручные демонстрации |
 | tooling | Архитектурные проверки, документация, сборка, подготовка корпуса |
 
@@ -45,6 +47,8 @@ core не импортирует SDK, Node API, адаптеры, app или ф�
 - Режим поиска (`rag.retrievalMode`): `baseline`, `filter`, `rewrite`, `rewrite-filter`; по умолчанию `rewrite-filter`.
 - Кандидаты: результат поиска до отбора (`rag.candidateTopK`); порог — `rag.similarityThreshold`, отбор оставляет `score >= порог`.
 - Контрольный вопрос: раздел `experiments/feod-retrieval/questions.md` с ожиданием и файлами-источниками корпуса; без источников — отрицательный.
+- Цитата: строка `- [N] «текст»` в ответе; `[N]` — `rank` фрагмента в сообщении; засчитывается, если после нормализации это подстрока текста чанка.
+- «Не знаю»: ответ без источников и цитат; при пустом отборе формирует код без вызова модели, иначе — модель.
 - top-K: конечный лимит чанков, которые получает модель (`rag.topK`); стратегия чанкинга — `rag.chunkStrategy`.
 - Agent: объект, обрабатывающий реплику через ModelPort. Command — команда CLI/REPL.
 - Не называй разные понятия просто strategy или mode: стратегия чанкинга — `Strategy`, режим поиска — `RetrievalMode`.
@@ -90,7 +94,7 @@ dependency-cruiser проверяет границы, циклы и import type.
 ## Команды разработки
 Node 24; npm ci; npm run hooks:install; npm run dev; npm run dev -- help.
 npm run corpus:feod; npm run dev -- rag index; npm run dev -- rag compare.
-npm run dev -- rag calibrate; npm run dev -- rag ask "вопрос"; npm run dev -- rag eval; в REPL — /rag on и /rag off.
+npm run dev -- rag calibrate; npm run dev -- rag ask "вопрос"; npm run dev -- rag eval; npm run dev -- rag citations; в REPL — /rag on и /rag off.
 npm run lint; npm run typecheck; npm test; npm run test:coverage; npm run build.
 npm run check; npm run check:deps; npm run check:structure; npm run docs:generate.
 
