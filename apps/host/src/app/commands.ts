@@ -16,6 +16,7 @@ type CommandContext = {
   setRagMode: (enabled: boolean) => readonly string[];
   ragCalibrate: () => Promise<RagOutcome>;
   ragEval: () => Promise<RagOutcome>;
+  ragCitations: () => Promise<RagOutcome>;
   view: CommandView;
 };
 
@@ -80,6 +81,16 @@ function ragAnswerCommands(context: CommandContext): Command[] {
       description: descriptions["rag eval"] ?? "",
       run: async () => {
         const outcome = await context.ragEval();
+        context.view.evalSaved(outcome.lines, outcome.path);
+        return "continue";
+      },
+    },
+    {
+      name: "rag citations",
+      arguments: [],
+      description: descriptions["rag citations"] ?? "",
+      run: async () => {
+        const outcome = await context.ragCitations();
         context.view.evalSaved(outcome.lines, outcome.path);
         return "continue";
       },

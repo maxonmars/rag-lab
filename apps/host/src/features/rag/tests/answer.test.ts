@@ -43,7 +43,8 @@ describe("answerWithRag", () => {
       query: "Что такое global?",
       contextChars: [...message].length,
     });
-    expect(result.answer).toContain("ответ:");
+    expect(result.answer).toMatchObject({ kind: "answer", problems: [{ code: "format" }] });
+    expect(result.answer).toMatchObject({ raw: expect.stringContaining("ответ:") });
   });
 
   it("filter не вызывает rewrite и убирает кандидатов ниже порога", async () => {
@@ -82,13 +83,40 @@ describe("answerWithRag", () => {
     }
   });
 
-  it("пустые hits не мешают ответу: модель вызывается с сообщением без фрагментов и исходным вопросом", async () => {
-    const { options, requests } = setup({ mode: "filter", threshold: 0.99 });
+  it("filter: пустой отбор — модель не вызывается, ответ «не знаю» по порогу с ближайшими кандидатами", async () => {
+    const { options, requests, kinds } = setup({ mode: "filter", threshold: 0.99 });
     const result = await answerWithRag(options);
     expect(result.hits).toEqual([]);
-    expect(requests).toHaveLength(1);
-    expect(requests[0]?.messages[1]?.content).toBe("## Фрагменты документации\n\n## Вопрос\n\nЧто такое global?");
-    expect(requests[0]?.messages[0]?.content).toContain(readPrompt("answer.md"));
+    expect(result.contextChars).toBe(0);
+    expect(kinds).toEqual([]);
+    expect(requests).toHaveLength(0);
+    expect(result.answer).toEqual({ kind: "unknown", by: "retrieval", threshold: 0.99, nearest: CANDIDATES });
+  });
+
+  it("rewrite-filter: пустой отбор не отменяет rewrite, но генерации нет", async () => {
+    const { options, kinds } = setup({ mode: "rewrite-filter", threshold: 0.99 });
+    const result = await answerWithRag(options);
+    expect(kinds).toEqual(["rewrite"]);
+    expect(result.answer).toMatchObject({ kind: "unknown", by: "retrieval", threshold: 0.99 });
+  });
+
+  it("baseline: порог не применяется, отказ возможен только при пустом поиске и без порога в тексте", async () => {
+    const full = setup({ mode: "baseline", threshold: 0.99 });
+    await answerWithRag(full.options);
+    expect(full.kinds).toEqual(["answer"]);
+    const empty = setup({ mode: "baseline", index: fakeSearchIndex(() => []).index });
+    const result = await answerWithRag(empty.options);
+    expect(empty.kinds).toEqual([]);
+    expect(result.answer).toEqual({ kind: "unknown", by: "retrieval", threshold: null, nearest: [] });
+  });
+
+  it("ответ модели в заданном формате разбирается без замечаний", async () => {
+    const quote = "Первый фрагмент содержит достаточно длинный текст";
+    const hits = [searchHit(1, "a.md", 0.9, `${quote} для цитаты.`)];
+    const answer = () => `## Ответ\n\nТак [1].\n\n## Источники\n\n- [1]\n\n## Цитаты\n\n- [1] «${quote}»`;
+    const { options } = setup({ index: fakeSearchIndex(() => hits).index }, { answer });
+    const result = await answerWithRag(options);
+    expect(result.answer).toMatchObject({ kind: "answer", text: "Так [1].", problems: [] });
   });
 
   it("считает размер сообщения в кодовых точках, а не в единицах UTF-16", async () => {
@@ -139,7 +167,14 @@ describe("answerWithRag", () => {
 describe("generateAnswer", () => {
   it("отвечает по готовым hits с исходным вопросом; принимает модель и hits, поиск ему недоступен", async () => {
     const { model, requests } = fakeModel();
-    const result = await generateAnswer({ model, systemPrompt: "S", question: "Исходный вопрос", hits: CANDIDATES });
+    const selection = { hits: CANDIDATES, belowThreshold: [], overLimit: [] };
+    const result = await generateAnswer({
+      model,
+      systemPrompt: "S",
+      question: "Исходный вопрос",
+      selection,
+      threshold: null,
+    });
     const message = renderRagMessage("Исходный вопрос", CANDIDATES);
     expect(requests).toHaveLength(1);
     expect(requests[0]?.messages[1]?.content).toBe(message);

@@ -1,3 +1,4 @@
+import { renderCitedAnswer } from "./citationRender.ts";
 import { type ModeOutcome, type QuestionResult, stageTotalMs } from "./evalMetrics.ts";
 import { filesList, quoteBlock, seconds, tableCell } from "./format.ts";
 import type { ControlQuestion } from "./questions.ts";
@@ -40,7 +41,7 @@ function answerBlock(mode: RetrievalMode, outcome: ModeOutcome): string[] {
     "",
     `Чанков передано: ${selection.hits.length} · сообщение: ${outcome.contextChars} символов · время этапов ${seconds(stageTotalMs(timings))} с (${stages.join(", ")})`,
     "",
-    ...quoteBlock(outcome.answer),
+    ...quoteBlock(renderCitedAnswer(outcome.answer)),
     "",
   ];
 }

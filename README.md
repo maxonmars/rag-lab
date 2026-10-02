@@ -6,7 +6,8 @@ FEOD (32 файла, около 174 тыс. символов) режется н�
 Второе задание — первый RAG-запрос: по вопросу ищутся ближайшие чанки, они склеиваются с вопросом и уходят в
 DeepSeek; ответы без RAG и с RAG сравниваются на 10 контрольных вопросах. Третье — порог релевантности и переписывание
 запроса: кандидаты фильтруются по cosine similarity, запрос для поиска переписывает DeepSeek, четыре режима поиска
-сравниваются на 15 вопросах. Цитаты и режим «не знаю» появятся в следующих заданиях. Каркас взят из mcp-lab
+сравниваются на 15 вопросах. Четвёртое — источники, цитаты и режим «не знаю»: ответ содержит источники и проверенные
+цитаты, а при пустом отборе по порогу модель не вызывается; формат проверяется на 10 вопросах. Каркас взят из mcp-lab
 ([ADR 0001](docs/adr/0001-repository-foundation.md)).
 
 ## Запуск
@@ -26,7 +27,7 @@ npm run dev -- rag compare
 `corpus:feod` клонирует feod-docs в `.local/rag/source`, переключает на закреплённый коммит и собирает 32 документа в
 `.local/rag/corpus`. Ollama должна быть запущена (`ollama serve`); `rag index` печатает ход по стратегиям в stderr.
 Результаты — `.local/rag/index.json` и `.local/rag/comparison.md` (каталог `.local/` не попадает в git).
-Ключ DeepSeek нужен для `ask`, `rag ask` и `rag eval`: `LAB_LLM_API_KEY` в корневом `.env` или окружении процесса.
+Ключ DeepSeek нужен для `ask`, `rag ask`, `rag eval` и `rag citations`: `LAB_LLM_API_KEY` в корневом `.env` или окружении процесса.
 `rag calibrate` ключа не требует.
 
 ```sh
@@ -43,19 +44,23 @@ npm run dev -- ask "Что такое чанкинг?"
 выключает (старт — без RAG). Поиск идёт по чанкам `rag.chunkStrategy` (`structure`) в режиме `rag.retrievalMode`
 (по умолчанию `rewrite-filter`): DeepSeek переписывает вопрос в поисковый запрос, поиск возвращает `rag.candidateTopK`
 (10) кандидатов, отбор оставляет чанки со сходством не ниже `rag.similarityThreshold` (0.55, выбран `rag calibrate`),
-и не больше `rag.topK` (5) уходят в модель вместе с исходным вопросом. Если отбор ничего не оставил, модель отвечает без
-фрагментов, а CLI пишет «Фрагменты: контекст пуст».
+и не больше `rag.topK` (5) уходят в модель вместе с исходным вопросом. Ответ содержит источники (`chunk_id`, URL) и цитаты,
+а код проверяет, что каждая цитата дословно есть в указанном фрагменте. Если отбор ничего не оставил, модель не вызывается:
+ответ — «не знаю» с просьбой уточнить вопрос, а CLI пишет «Фрагменты: контекст пуст».
 
 ```sh
 npm run dev -- rag calibrate --rag-questions-file experiments/feod-rag/questions.md
 npm run dev -- rag ask "Что можно хранить в global?"
 npm run dev -- --rag-retrieval-mode=baseline rag ask "Что можно хранить в global?"
 npm run dev -- rag eval
+npm run dev -- rag citations --rag-questions-file experiments/feod-citations/questions.md
 npm run dev
 ```
 
 `rag calibrate` подбирает порог без модели генерации и пишет `.local/rag/rag-calibration.md`; настройки он не меняет.
-`rag eval` всегда сравнивает четыре режима на вопросах `rag.questionsFile` и пишет `.local/rag/rag-eval.md`. В REPL:
+`rag eval` всегда сравнивает четыре режима на вопросах `rag.questionsFile` и пишет `.local/rag/rag-eval.md`.
+`rag citations` прогоняет те же вопросы в режиме `rag.retrievalMode` и пишет `.local/rag/rag-citations.md` с проверкой
+цитат. В REPL:
 `/rag on`, вопрос, `/rag off`, тот же вопрос.
 
 Настройки — YAML-файл, env (`LAB_RAG_…`) и флаги; приоритет и список — [docs/configuration.md](docs/configuration.md),
@@ -66,10 +71,13 @@ npm run dev
 - [ADR 0002](docs/adr/0002-document-indexing.md) — решения индексации и выбор модели эмбеддингов.
 - [ADR 0003](docs/adr/0003-first-rag-query.md) — поиск, режим RAG, контрольные вопросы.
 - [ADR 0004](docs/adr/0004-relevance-filter-and-query-rewrite.md) — порог релевантности, rewrite, калибровка, сравнение режимов.
+- [ADR 0005](docs/adr/0005-citations-and-refusal.md) — источники, цитаты, проверка дословности, режим «не знаю».
 - [Фича rag](apps/host/src/features/rag/README.md) — контракт, формат индекса, ограничения.
-- Демо [индексации](docs/demos/indexing.md), [RAG-запроса](docs/demos/rag-query.md) и
-  [режимов поиска](docs/demos/retrieval-modes.md), эксперименты [feod-chunking](experiments/feod-chunking/README.md),
-  [feod-rag](experiments/feod-rag/README.md) и [feod-retrieval](experiments/feod-retrieval/README.md) — воспроизведение и выводы.
+- Демо [индексации](docs/demos/indexing.md), [RAG-запроса](docs/demos/rag-query.md),
+  [режимов поиска](docs/demos/retrieval-modes.md) и [цитат](docs/demos/citations.md), эксперименты
+  [feod-chunking](experiments/feod-chunking/README.md), [feod-rag](experiments/feod-rag/README.md),
+  [feod-retrieval](experiments/feod-retrieval/README.md) и [feod-citations](experiments/feod-citations/README.md) —
+  воспроизведение и выводы.
 - [Архитектура](ARCHITECTURE.md), [курс](docs/course.md), [правила для агентов](AGENTS.md).
 
 ## Проверки

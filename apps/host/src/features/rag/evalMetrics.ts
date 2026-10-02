@@ -1,4 +1,5 @@
 import type { StageTimings } from "./answer.ts";
+import type { CitedAnswer } from "./citations.ts";
 import { type ControlQuestion, foundSources } from "./questions.ts";
 import { forEachMode, type RetrievalMode } from "./retrieval.ts";
 import type { SearchHit } from "./search.ts";
@@ -8,7 +9,7 @@ export type ModeOutcome = Readonly<{
   query: string;
   candidates: readonly SearchHit[];
   selection: Selection;
-  answer: string;
+  answer: CitedAnswer;
   contextChars: number;
   /** Этапы этого режима, включая общие с парным режимом поиск и rewrite. */
   timings: StageTimings;

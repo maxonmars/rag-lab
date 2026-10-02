@@ -3,7 +3,7 @@
 ## Текущее приложение
 
 Исполняемый workspace `apps/host`. Общих библиотек и серверов нет. `app/main.ts` принимает окружение, argv и потоки;
-`app/compose.ts` собирает приложение. Модель DeepSeek создаётся лениво при первом `ask`, `rag ask` или `rag eval`, поэтому
+`app/compose.ts` собирает приложение. Модель DeepSeek создаётся лениво при первом `ask`, `rag ask`, `rag eval` или `rag citations`, поэтому
 справка, настройки, `rag index`, `rag compare` и `rag calibrate` работают без ключа.
 
 ```mermaid
@@ -66,20 +66,23 @@ Ollama лежит внутри фичи, потому что не нужен н�
    Поиск возвращает `rag.candidateTopK` кандидатов стратегии `rag.chunkStrategy` по этой строке или по исходному вопросу.
 3. Отбор — чистая функция над готовым списком: при фильтре `score >= rag.similarityThreshold`, затем первые `rag.topK`.
    Порядок и score не меняются, это не реранкинг.
-4. Генерация по готовым hits: `renderRagMessage` собирает Markdown с фрагментами и **исходным** вопросом,
-   `Agent(system.md + answer.md).respond(сообщение)` — история между вызовами не накапливается. Пустой список hits модель не
-   останавливает.
+4. Генерация по готовому отбору: при пустых hits модель не вызывается, код возвращает «не знаю» с просьбой уточнить вопрос.
+   Иначе `renderRagMessage` собирает Markdown с фрагментами и **исходным** вопросом,
+   `Agent(system.md + answer.md).respond(сообщение)` — история между вызовами не накапливается. Ответ разбирается в
+   `CitedAnswer`: `[N]` раскрывается в чанк по `rank`, каждая цитата проверяется на дословность, нарушения контракта
+   возвращаются списком замечаний, а не исключением.
 
 Параметры (`candidateTopK`, `topK`, порог) проверяет одна функция `checkRetrievalParams` до любых внешних вызовов.
 `rag calibrate` использует только поиск и `EmbeddingPort`: один поиск на вопрос, четыре порога на общих кандидатах.
 `rag eval` не вызывает `answerWithRag` четыре раза: на вопрос — исходный поиск (baseline, filter), один rewrite и один
-поиск переписанной строки (rewrite, rewrite-filter), четыре генерации на общих кандидатах. Отчёты `rag-calibration.md` и
-`rag-eval.md` пишутся один раз после успеха.
+поиск переписанной строки (rewrite, rewrite-filter), до четырёх генераций на общих кандидатах (при пустом отборе генерации
+нет). `rag citations` вызывает `answerWithRag` на каждый вопрос в настроенном режиме. Отчёты `rag-calibration.md`,
+`rag-eval.md` и `rag-citations.md` пишутся один раз после успеха.
 
 App создаёт новый `SearchIndex` на каждый `rag ask` (свежий индекс после `rag index` в той же сессии) и один на весь
-`rag eval` и `rag calibrate`. Контрольные вопросы — `experiments/feod-retrieval/questions.md`; оценки качества в отчёты не
-входят, их пишет автор в README эксперимента. Решения — [ADR 0003](docs/adr/0003-first-rag-query.md) и
-[ADR 0004](docs/adr/0004-relevance-filter-and-query-rewrite.md).
+`rag eval`, `rag citations` и `rag calibrate`. Контрольные вопросы — `experiments/feod-retrieval/questions.md`; оценки качества в отчёты не
+входят, их пишет автор в README эксперимента. Решения — [ADR 0003](docs/adr/0003-first-rag-query.md),
+[ADR 0004](docs/adr/0004-relevance-filter-and-query-rewrite.md) и [ADR 0005](docs/adr/0005-citations-and-refusal.md).
 
 ## Границы и рост
 

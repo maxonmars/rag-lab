@@ -39,6 +39,7 @@ export async function run(options: RunOptions): Promise<number> {
       return modeLines(enabled, config);
     },
     ragEval: ragAnswer.evaluate,
+    ragCitations: ragAnswer.citations,
     view,
   });
   let command: string[];

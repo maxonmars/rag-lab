@@ -1,11 +1,15 @@
 import type { CliView } from "../adapters/cli/index.ts";
 import {
   answerWithRag,
+  type CitationEvalResult,
   type EvalProgress,
   type EvalResult,
+  evaluateCitations,
   evaluateQuestions,
   openIndex,
   RETRIEVAL_MODES,
+  type RetrievalMode,
+  renderCitedAnswer,
   type SearchHit,
   usesFilter,
 } from "../features/rag/index.ts";
@@ -66,6 +70,17 @@ function evalLines(result: EvalResult, topK: number): string[] {
   return [`Вопросов: ${result.questions}`, `Длительность прогона: ${(result.wallMs / 1000).toFixed(1)} с`, ...modes];
 }
 
+function citationLines(result: CitationEvalResult, mode: RetrievalMode): string[] {
+  const { metrics: m } = result;
+  return [
+    `Вопросов: ${result.questions}, режим ${mode}`,
+    `Положительные: с источниками ${share(m.withSources, m.positives)}, с цитатами ${share(m.withQuotes, m.positives)}, ожидаемый файл среди источников ${share(m.expectedCited, m.positives)}, «не знаю» ${share(m.positiveUnknown, m.positives)}`,
+    `Отрицательные: «не знаю» ${share(m.unknownByRetrieval + m.unknownByModel, m.negatives)} (пустой контекст ${m.unknownByRetrieval}, моделью ${m.unknownByModel})`,
+    `Цитаты дословно: ${share(m.verifiedQuotes, m.quotes)}; ответов без замечаний: ${share(m.clean, m.questions)}`,
+    `Длительность прогона: ${(result.wallMs / 1000).toFixed(1)} с`,
+  ];
+}
+
 export function createRagAnswerHandlers(options: RagAnswerHandlerOptions) {
   // Параметры проверяются первыми, модель создаётся до индекса: ошибка ключа приходит раньше, чем обращение к Ollama.
   async function prepare() {
@@ -90,7 +105,7 @@ export function createRagAnswerHandlers(options: RagAnswerHandlerOptions) {
         mode,
         ...retrieval,
       });
-      return { answer: result.answer, fragments: fragmentLines(result.hits) };
+      return { answer: renderCitedAnswer(result.answer), fragments: fragmentLines(result.hits) };
     },
 
     async evaluate(): Promise<RagOutcome> {
@@ -106,6 +121,23 @@ export function createRagAnswerHandlers(options: RagAnswerHandlerOptions) {
         onProgress: (event) => options.view.progress(`${event.id}: ${STEP_LABELS[event.step]}`),
       });
       return { lines: evalLines(result, retrieval.topK), path: result.path };
+    },
+
+    async citations(): Promise<RagOutcome> {
+      const { values, paths, model, index, retrieval } = await prepare();
+      const mode = values["rag.retrievalMode"];
+      const result = await evaluateCitations({
+        questionsFile: paths.questionsFile,
+        reportFile: paths.citationsFile,
+        index,
+        model,
+        systemPrompt: systemPrompt(),
+        mode,
+        ...retrieval,
+        meta: { questionsFile: values["rag.questionsFile"], llmModel: values["llm.model"] },
+        onProgress: (event) => options.view.progress(`${event.id}: ответ с источниками`),
+      });
+      return { lines: citationLines(result, mode), path: result.path };
     },
   };
 }

@@ -30,6 +30,7 @@ export function generatedDocs(): Record<string, string> {
     ragMode: () => false,
     setRagMode: () => [],
     ragEval: async () => ({ lines: [], path: "" }),
+    ragCitations: async () => ({ lines: [], path: "" }),
     view: silentView,
   });
   const commands = registry.map(

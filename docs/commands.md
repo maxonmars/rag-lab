@@ -14,10 +14,11 @@ CLI использует quoting оболочки; в REPL остаток /ask �
 | rag index | /rag index | Разбить корпус двумя стратегиями (fixed и structure), получить эмбеддинги через Ollama и сохранить оба индекса в index.json. Нужны запущенная Ollama и скачанная модель. |
 | rag compare | /rag compare | Прочитать сохранённый index.json и записать отчёт comparison.md со сравнением стратегий без обращения к модели. |
 | rag calibrate | /rag calibrate | Подобрать порог сходства по контрольным вопросам rag.questionsFile: один поиск на вопрос, проверка порогов 0.50, 0.55, 0.60 и 0.65, отчёт rag-calibration.md и рекомендуемое значение; настройки не меняются. Нужны индекс и запущенная Ollama; модель генерации и ключ DeepSeek не нужны. |
-| rag ask <текст...> | /rag ask | Найти в index.json фрагменты по вопросу в режиме rag.retrievalMode (по умолчанию rewrite-filter) и ответить по ним; всегда с RAG, независимо от режима сессии. Нужны индекс, запущенная Ollama с моделью индекса и LAB_LLM_API_KEY. |
+| rag ask <текст...> | /rag ask | Найти в index.json фрагменты по вопросу в режиме rag.retrievalMode (по умолчанию rewrite-filter) и ответить по ним; всегда с RAG, независимо от режима сессии. Ответ содержит источники и цитаты; если после отбора фрагментов нет — «не знаю» с просьбой уточнить вопрос без вызова модели. Нужны индекс, запущенная Ollama с моделью индекса и LAB_LLM_API_KEY. |
 | rag on | /rag on | Включить режим RAG до конца сессии REPL: обычные строки и /ask отвечают с поиском по индексу в режиме rag.retrievalMode. В CLI действует только на этот запуск. |
 | rag off | /rag off | Выключить режим RAG до конца сессии REPL: обычные строки и /ask отвечают без поиска. В CLI действует только на этот запуск. |
-| rag eval | /rag eval | Прогнать контрольные вопросы во всех четырёх режимах поиска (baseline, filter, rewrite, rewrite-filter) независимо от rag.retrievalMode и записать отчёт rag-eval.md. Нужны индекс, запущенная Ollama, LAB_LLM_API_KEY и файл вопросов из rag.questionsFile. |
+| rag eval | /rag eval | Прогнать контрольные вопросы во всех четырёх режимах поиска (baseline, filter, rewrite, rewrite-filter) независимо от rag.retrievalMode и записать отчёт rag-eval.md. При пустом контексте после отбора ответ «не знаю» формируется без вызова модели. Нужны индекс, запущенная Ollama, LAB_LLM_API_KEY и файл вопросов из rag.questionsFile. |
+| rag citations | /rag citations | Прогнать контрольные вопросы rag.questionsFile в режиме rag.retrievalMode и записать отчёт rag-citations.md: источники (chunk_id, source), проверка цитат на дословность, ответы «не знаю». Нужны индекс, запущенная Ollama и LAB_LLM_API_KEY. |
 | exit | /exit | Завершить ввод реплик. |
 
 Алиасы help: --help, -h.
