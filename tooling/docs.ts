@@ -26,7 +26,7 @@ function stubRegistry() {
     ragCompare: async () => ({ lines: [], path: "" }),
     ragCalibrate: async () => ({ lines: [], path: "" }),
     ragAsk: async () => ({ answer: "", fragments: [] }),
-    ragChat: async () => ({ answer: "", fragments: [], goal: "" }),
+    ragChat: async () => ({ answer: "", fragments: [], goal: "", remembered: [] }),
     ragState: () => [],
     ragReset: () => [],
     ragMode: () => false,

@@ -35,27 +35,38 @@ export function checkHistoryTurns(historyTurns: number): void {
   }
 }
 
-const CITATION_MARK = /[ \t]*\[\d+\]/g;
+const SECTION_START = /^## /m;
 const EMPTY_LINES = "—";
-const REFUSAL_BY_RETRIEVAL = "Не знаю: в документации не найдено фрагментов по этому вопросу.";
+const REFUSAL_BY_RETRIEVAL = "## Не знаю\n\nВ документации не найдено фрагментов по этому вопросу.";
 
-function sourceLabels(answer: Extract<CitedAnswer, { kind: "answer" }>): string[] {
-  const labels = answer.sources.flatMap(({ hit }) =>
-    hit === undefined ? [] : [`\`${hit.chunk.file}\` › ${hit.chunk.sections[0] ?? hit.chunk.title}`],
-  );
-  return [...new Set(labels)];
+type Answered = Extract<CitedAnswer, { kind: "answer" }>;
+
+function sourceLine({ fragment, hit }: Answered["sources"][number]): string {
+  return hit === undefined
+    ? `- [${fragment}]`
+    : `- [${fragment}] \`${hit.chunk.file}\` › ${hit.chunk.sections[0] ?? hit.chunk.title}`;
 }
 
-/** Ответ для истории без `[N]` и без UI-статусов: номера фрагментов прошлых ходов не совпадают с номерами текущего сообщения. */
-export function assistantHistoryText(answer: CitedAnswer): string {
-  if (answer.kind === "unknown") {
-    if (answer.by === "retrieval") return REFUSAL_BY_RETRIEVAL;
-    return answer.clarification === ""
-      ? `Не знаю. ${answer.text}`
-      : `Не знаю. ${answer.text}\n\nУточнение: ${answer.clarification}`;
+function answeredText(answer: Answered): string {
+  // У ответа с нарушением формата `text` — весь сырой ответ: в историю идёт только текст до первого раздела.
+  const [body = ""] = answer.text.split(SECTION_START);
+  const sections = [`## Ответ\n\n${body.trim()}`];
+  if (answer.sources.length > 0) sections.push(`## Источники\n\n${answer.sources.map(sourceLine).join("\n")}`);
+  if (answer.quotes.length > 0) {
+    sections.push(`## Цитаты\n\n${answer.quotes.map((quote) => `- [${quote.fragment}] «${quote.text}»`).join("\n")}`);
   }
-  const labels = sourceLabels(answer);
-  return `${answer.text.replace(CITATION_MARK, "").trim()}\n\nИсточники: ${labels.length > 0 ? labels.join("; ") : "нет"}`;
+  return sections.join("\n\n");
+}
+
+/**
+ * Ответ для истории в формате ответа модели; источник дополнен файлом и разделом, потому что `[N]` относится к фрагментам
+ * своего хода. Реплики истории модель копирует охотнее инструкции, поэтому формат у них полный.
+ */
+export function assistantHistoryText(answer: CitedAnswer): string {
+  if (answer.kind === "answer") return answeredText(answer);
+  if (answer.by === "retrieval") return REFUSAL_BY_RETRIEVAL;
+  const refusal = `## Не знаю\n\n${answer.text}`;
+  return answer.clarification === "" ? refusal : `${refusal}\n\n## Уточнение\n\n${answer.clarification}`;
 }
 
 /** Последние `historyTurns` ходов парами «вопрос — ответ» в хронологическом порядке. */
@@ -67,13 +78,13 @@ export function historyMessages(dialog: Dialog, historyTurns: number): DialogMes
   ]);
 }
 
-/** Реплики строками `- Пользователь: …` / `- Ассистент: …` в одну строку каждая; пустой список — «—». */
+/** Реплики строками `- Пользователь: …` / `- Ассистент: …` в одну строку каждая, заголовок `## X` — `X:`; пустой список — «—». */
 export function recentLines(messages: readonly DialogMessage[]): string {
   if (messages.length === 0) return EMPTY_LINES;
   return messages
     .map(
       (message) =>
-        `- ${message.role === "user" ? "Пользователь" : "Ассистент"}: ${message.content.replace(/\s+/g, " ")}`,
+        `- ${message.role === "user" ? "Пользователь" : "Ассистент"}: ${message.content.replace(/^## (.+)$/gm, "$1:").replace(/\s+/g, " ")}`,
     )
     .join("\n");
 }

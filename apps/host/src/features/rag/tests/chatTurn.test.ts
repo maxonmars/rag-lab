@@ -67,12 +67,15 @@ describe("chatTurn: история и память в запросе ответ�
     const messages = request?.messages ?? [];
     expect(messages.map((message) => message.role)).toEqual(["system", "user", "assistant", "user"]);
     expect(messages[1]).toEqual({ role: "user", content: "Что в первом файле?" });
-    expect(messages[2]).toEqual({ role: "assistant", content: "Так.\n\nИсточники: `a.md` › Doc › a.md" });
+    expect(messages[2]).toEqual({
+      role: "assistant",
+      content: expect.stringMatching(/^## Ответ\n\nТак[\s\S]*\n\n## Источники\n\n- \[1\] `a\.md` › /),
+    });
     expect(String(messages[3]?.content)).toMatch(/^## Память задачи\n\n### Цель\n\nперевести проект на FEOD/);
     expect(String(messages[0]?.content)).toContain(readPrompt("chat.md"));
   });
 
-  it("память задачи на втором ходу получает прошлую память и последний обмен", async () => {
+  it("память задачи на втором ходу получает прошлую память и новое сообщение, без реплик ассистента", async () => {
     const { options, ofKind } = chatSetup();
     const first = await chatTurn(options);
     await chatTurn({ ...options, dialog: first.dialog, question: "Уточню: 40 страниц" });
@@ -80,7 +83,7 @@ describe("chatTurn: история и память в запросе ответ�
     expect(request?.messages[0]?.content).toBe(readPrompt("task-state.md"));
     const user = String(request?.messages[1]?.content);
     expect(user).toContain("## Текущая память задачи\n\n### Цель\n\nперевести проект на FEOD");
-    expect(user).toContain("## Последний обмен\n\n- Пользователь: Что в первом файле?\n- Ассистент: Так.");
+    expect(user).not.toContain("Так.");
     expect(user.endsWith("## Новое сообщение пользователя\n\nУточню: 40 страниц")).toBe(true);
   });
 

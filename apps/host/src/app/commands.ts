@@ -145,7 +145,7 @@ function askCommand(context: CommandContext): Command {
       const text = args.join(" ");
       if (context.ragMode()) {
         const reply = await context.ragChat(text);
-        context.view.chatAnswer(reply.answer, reply.fragments, reply.goal);
+        context.view.chatAnswer(reply.answer, reply.fragments, reply.goal, reply.remembered);
       } else context.view.answer(await context.ask(text));
       return "continue";
     },

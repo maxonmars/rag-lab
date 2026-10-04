@@ -13,7 +13,7 @@ import type { SearchIndex } from "../search.ts";
 import { selectForMode } from "../select.ts";
 import { timed } from "../timing.ts";
 import type { Strategy } from "../types.ts";
-import { checkHistoryTurns, type Dialog, type DialogTurn, historyMessages, recentLines } from "./dialog.ts";
+import { checkHistoryTurns, type Dialog, type DialogTurn, historyMessages } from "./dialog.ts";
 import { nestedTaskState, parseTaskState } from "./taskState.ts";
 
 /** Сколько последних ходов видит rewrite: ему нужны только отсылки ближайших реплик. */
@@ -33,10 +33,10 @@ export type ChatTurnOptions = RetrievalParams &
 
 export type ChatTurnResult = Readonly<{ turn: DialogTurn; dialog: Dialog }>;
 
+// Ответов ассистента здесь нет: с ними модель записывала в память утверждения документации как договорённости.
 function stateMessage(dialog: Dialog, question: string): string {
   return [
     `## Текущая память задачи\n\n${nestedTaskState(dialog.state)}`,
-    `## Последний обмен\n\n${recentLines(historyMessages(dialog, 1))}`,
     `## Новое сообщение пользователя\n\n${question}`,
   ].join("\n\n");
 }

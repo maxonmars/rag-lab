@@ -65,7 +65,7 @@ describe("evaluateDialogs: прогон", () => {
     expect(kinds).toEqual(Array.from({ length: 3 }, () => ["state", "rewrite", "answer"]).flat());
     expect(result).toMatchObject({ path: options.reportFile, scenarios: 2, turns: 3 });
     expect(ofKind("answer").map((request) => request.messages.length)).toEqual([2, 4, 2]);
-    expect(String(ofKind("state")[2]?.messages[1]?.content)).toContain("## Последний обмен\n\n—");
+    expect(String(ofKind("state")[2]?.messages[1]?.content)).toContain("## Текущая память задачи\n\n### Цель\n\n—");
   });
 
   it("сообщает номер реплики перед её обработкой", async () => {

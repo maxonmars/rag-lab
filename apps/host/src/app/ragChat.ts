@@ -6,19 +6,31 @@ import {
   type RetrievalMode,
   renderCitedAnswer,
   renderTaskState,
+  type TaskState,
 } from "../features/rag/index.ts";
 import { systemPrompt } from "./ask.ts";
 import type { RagOutcome } from "./rag.ts";
 import { fragmentLines, prepareRag, type RagAnswerHandlerOptions, type RagReply } from "./ragAnswer.ts";
 
-/** Ответ чата: `goal` — цель из памяти задачи после хода, пусто — не зафиксирована. */
-export type ChatReply = RagReply & Readonly<{ goal: string }>;
+/** Ответ чата: `goal` — цель из памяти задачи после хода, пусто — не зафиксирована; `remembered` — пункты памяти, появившиеся в этом ходу. */
+export type ChatReply = RagReply & Readonly<{ goal: string; remembered: readonly string[] }>;
 
 const share = (part: number, whole: number): string => (whole === 0 ? "—" : `${part} из ${whole}`);
 
 export function stateLines(dialog: Dialog): string[] {
   if (dialog.turns.length === 0) return ["Память задачи пуста."];
   return [`Ходов: ${dialog.turns.length}`, "", ...renderTaskState(dialog.state).split("\n")];
+}
+
+/** Пункты, которых не было в памяти до хода; переформулированный пункт тоже считается новым. */
+export function rememberedLines(before: TaskState, after: TaskState): string[] {
+  const added = (label: string, was: readonly string[], now: readonly string[]) =>
+    now.filter((item) => !was.includes(item)).map((item) => `${label}: ${item}`);
+  return [
+    ...(after.goal !== before.goal && after.goal !== "" ? [`цель: ${after.goal}`] : []),
+    ...added("уточнение", before.clarifications, after.clarifications),
+    ...added("ограничение или термин", before.constraints, after.constraints),
+  ];
 }
 
 function dialogLines(result: DialogEvalResult, mode: RetrievalMode, historyTurns: number): string[] {
@@ -53,6 +65,7 @@ export function createRagChatHandlers(options: RagAnswerHandlerOptions) {
         answer: renderCitedAnswer(turn.answer),
         fragments: fragmentLines(turn.hits),
         goal: turn.state.goal,
+        remembered: rememberedLines(dialog.state, turn.state),
       };
       return { reply, dialog: result.dialog };
     },
