@@ -46,7 +46,7 @@ describe("Agent: несколько раундов до maxToolCalls", () => {
       .mockResolvedValueOnce(textCompletion("Готово"));
     const source = fakeSource();
     const agent = new Agent({ complete }, "Инструкция", { maxToolCalls: 3 });
-    await expect(agent.respond("Вопрос", source)).resolves.toBe("Готово");
+    await expect(agent.respond("Вопрос", { tools: source })).resolves.toBe("Готово");
     expect(complete).toHaveBeenCalledTimes(4);
     expect(source.callTool).toHaveBeenCalledTimes(3);
     for (const call of complete.mock.calls.slice(0, 3)) expect((call[0] as ModelRequest).toolChoice).toBe("auto");
@@ -69,7 +69,7 @@ describe("Agent: несколько раундов до maxToolCalls", () => {
       .mockResolvedValueOnce(callCompletion({ id: "call-2", name: "tool_b" }))
       .mockResolvedValueOnce(textCompletion("Готово"));
     const agent = new Agent({ complete }, "Инструкция", { maxToolCalls: 2 });
-    await expect(agent.respond("Вопрос", fakeSource())).resolves.toBe("Готово");
+    await expect(agent.respond("Вопрос", { tools: fakeSource() })).resolves.toBe("Готово");
     expect(requestAt(complete, 0).toolChoice).toBe("auto");
     expect(requestAt(complete, 1).toolChoice).toBe("auto");
     expect(requestAt(complete, 2).toolChoice).toBe("none");
@@ -81,7 +81,7 @@ describe("Agent: несколько раундов до maxToolCalls", () => {
       .mockResolvedValueOnce(callCompletion({ id: "call-1", name: "tool_a" }))
       .mockResolvedValueOnce(textCompletion("Готово"));
     const agent = new Agent({ complete }, "Инструкция", { maxToolCalls: 2 });
-    await agent.respond("Вопрос", fakeSource());
+    await agent.respond("Вопрос", { tools: fakeSource() });
     expect(requestAt(complete, 0).messages).toHaveLength(2);
   });
 
@@ -100,7 +100,7 @@ describe("Agent: несколько раундов до maxToolCalls", () => {
       .mockResolvedValueOnce(callCompletion({ id: "call-1", name: "tool_a" }, { id: "call-2", name: "tool_b" }))
       .mockResolvedValueOnce(textCompletion("Готово"));
     const agent = new Agent({ complete }, "Инструкция", { maxToolCalls: 2 });
-    const responded = agent.respond("Вопрос", source);
+    const responded = agent.respond("Вопрос", { tools: source });
     await vi.waitFor(() => expect(order).toEqual(["start:tool_a"]));
     gate.resolve();
     await expect(responded).resolves.toBe("Готово");
@@ -118,7 +118,7 @@ describe("Agent: несколько раундов до maxToolCalls", () => {
       .mockResolvedValue(callCompletion({ id: "call-1", name: "tool_a" }, { id: "call-2", name: "unknown_tool" }));
     const source = fakeSource();
     const agent = new Agent({ complete }, "Инструкция", { maxToolCalls: 2 });
-    await expect(agent.respond("Вопрос", source)).rejects.toMatchObject({ code: "UNKNOWN_TOOL_CALL" });
+    await expect(agent.respond("Вопрос", { tools: source })).rejects.toMatchObject({ code: "UNKNOWN_TOOL_CALL" });
     expect(source.callTool).not.toHaveBeenCalled();
   });
 
@@ -133,7 +133,7 @@ describe("Agent: несколько раундов до maxToolCalls", () => {
     const complete = vi.fn().mockResolvedValue(badCompletion);
     const source = fakeSource();
     const agent = new Agent({ complete }, "Инструкция", { maxToolCalls: 2 });
-    await expect(agent.respond("Вопрос", source)).rejects.toMatchObject({ code: "INVALID_TOOL_ARGUMENTS" });
+    await expect(agent.respond("Вопрос", { tools: source })).rejects.toMatchObject({ code: "INVALID_TOOL_ARGUMENTS" });
     expect(source.callTool).not.toHaveBeenCalled();
   });
 
@@ -149,7 +149,7 @@ describe("Agent: несколько раундов до maxToolCalls", () => {
       );
     const source = fakeSource();
     const agent = new Agent({ complete }, "Инструкция", { maxToolCalls: 2 });
-    await expect(agent.respond("Вопрос", source)).rejects.toMatchObject({
+    await expect(agent.respond("Вопрос", { tools: source })).rejects.toMatchObject({
       code: "TOOL_CALL_LIMIT_EXCEEDED",
       data: { limit: 2 },
     });
@@ -163,7 +163,7 @@ describe("Agent: несколько раундов до maxToolCalls", () => {
       .mockResolvedValueOnce(callCompletion({ id: "call-2", name: "tool_b" }));
     const source = fakeSource();
     const agent = new Agent({ complete }, "Инструкция", { maxToolCalls: 1 });
-    await expect(agent.respond("Вопрос", source)).rejects.toMatchObject({
+    await expect(agent.respond("Вопрос", { tools: source })).rejects.toMatchObject({
       code: "TOOL_CALL_LIMIT_EXCEEDED",
       data: { limit: 1 },
     });
@@ -178,7 +178,7 @@ describe("Agent: несколько раундов до maxToolCalls", () => {
       .mockResolvedValueOnce(callCompletion({ id: "call-1", name: "tool_a" }))
       .mockResolvedValueOnce(textCompletion("Не удалось."));
     const agent = new Agent({ complete }, "Инструкция", { maxToolCalls: 1 });
-    await expect(agent.respond("Вопрос", source)).resolves.toBe("Не удалось.");
+    await expect(agent.respond("Вопрос", { tools: source })).resolves.toBe("Не удалось.");
     const messages = requestAt(complete, 1).messages;
     expect(messages.at(-1)).toEqual({ role: "tool", toolCallId: "call-1", content: "не найдено" });
   });

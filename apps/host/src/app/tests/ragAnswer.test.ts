@@ -1,9 +1,9 @@
 import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ModelRequest } from "../../core/index.ts";
-import { fakeEmbeddings, invoke, writeCorpus } from "./harness.ts";
+import { type CompleteMock, fakeEmbeddings, invoke, writeCorpus } from "./harness.ts";
 
 const QUESTIONS = [
   "# Контрольные вопросы",
@@ -29,6 +29,13 @@ beforeEach(async () => {
 afterEach(() => {
   rmSync(cwd, { recursive: true, force: true });
 });
+
+/** Как echo harness, но rewrite отвечает одной строкой: многострочный запрос в чате — REWRITE_INVALID. */
+const echoWithRewrite = (): CompleteMock =>
+  vi.fn(async (request: ModelRequest) => {
+    const rewrite = String(request.messages[0]?.content).includes("переписываешь");
+    return { type: "text" as const, content: rewrite ? "запрос" : `Ответ: ${request.messages.at(-1)?.content}` };
+  });
 
 const requestOf = (result: { complete: { mock: { calls: unknown[][] } } }, call = 0) =>
   result.complete.mock.calls[call]?.[0] as ModelRequest;
@@ -135,26 +142,32 @@ describe("rag ask", () => {
 describe("режим сессии REPL", () => {
   it("/rag on отправляет обычную строку в настроенный конвейер, /rag off возвращает ответ без поиска", async () => {
     const input = "/rag on\nВопрос один\n/rag off\nВопрос два\n/exit\n";
-    const result = await invoke([], { cwd, input, embeddings: fakeEmbeddings() });
+    const result = await invoke([], { cwd, input, embeddings: fakeEmbeddings(), complete: echoWithRewrite() });
     expect(result.code).toBe(0);
     expect(result.output).toContain(
       "── Режим ──\n\nОтветы с RAG: стратегия structure, режим rewrite-filter, кандидатов 10, итоговый top-5, порог 0.55.",
     );
     expect(result.output).toContain("Ответы без RAG.");
-    expect(result.output.match(/── Ответ агента · RAG ──/g)).toHaveLength(1);
+    expect(result.output.match(/── Ответ агента · RAG-чат ──/g)).toHaveLength(1);
     expect(result.output).toContain("\n── Ответ агента ──\n\nОтвет: Вопрос два\n");
-    expect(result.complete).toHaveBeenCalledTimes(3);
-    expect(requestOf(result, 0).messages[0]?.content).toContain("переписываешь");
-    expect(requestOf(result, 1).messages[1]?.content).toContain("## Вопрос\n\nВопрос один");
-    expect(requestOf(result, 2).messages[1]?.content).toBe("Вопрос два");
-    expect(requestOf(result, 2).messages[0]?.content).not.toContain("фрагменты документации");
+    expect(result.complete).toHaveBeenCalledTimes(4);
+    expect(requestOf(result, 0).messages[0]?.content).toContain("обновляешь память задачи");
+    expect(requestOf(result, 1).messages[0]?.content).toContain("переписываешь");
+    expect(requestOf(result, 2).messages[1]?.content).toContain("## Вопрос\n\nВопрос один");
+    expect(requestOf(result, 3).messages[1]?.content).toBe("Вопрос два");
+    expect(requestOf(result, 3).messages[0]?.content).not.toContain("фрагменты документации");
   });
 
   it("/ask следует режиму сессии, а режим по умолчанию — без RAG", async () => {
     const off = await invoke([], { cwd, input: "/ask Вопрос\n/exit\n", embeddings: fakeEmbeddings() });
-    const on = await invoke([], { cwd, input: "/rag on\n/ask Вопрос\n/exit\n", embeddings: fakeEmbeddings() });
+    const on = await invoke([], {
+      cwd,
+      input: "/rag on\n/ask Вопрос\n/exit\n",
+      embeddings: fakeEmbeddings(),
+      complete: echoWithRewrite(),
+    });
     expect(off.output).toContain("── Ответ агента ──");
-    expect(on.output).toContain("── Ответ агента · RAG ──");
+    expect(on.output).toContain("── Ответ агента · RAG-чат ──");
   });
 
   it("режим не переносится между запусками CLI", async () => {

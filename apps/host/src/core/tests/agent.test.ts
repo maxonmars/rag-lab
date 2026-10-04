@@ -50,7 +50,7 @@ describe("Agent с ToolSource, но без вызова инструмента",
     const complete = vi.fn().mockResolvedValue(textCompletion("Обычный ответ"));
     const source = fakeSource();
     const agent = new Agent({ complete }, "Инструкция");
-    await expect(agent.respond("Вопрос", source)).resolves.toBe("Обычный ответ");
+    await expect(agent.respond("Вопрос", { tools: source })).resolves.toBe("Обычный ответ");
     expect(source.listTools).toHaveBeenCalledOnce();
     expect(source.callTool).not.toHaveBeenCalled();
     expect(complete).toHaveBeenCalledTimes(1);
@@ -71,7 +71,9 @@ describe("Agent выполняет ровно один tool call", () => {
       .mockResolvedValueOnce(textCompletion("В Новосибирске ясно, 12°C."));
     const source = fakeSource();
     const agent = new Agent({ complete }, "Инструкция");
-    await expect(agent.respond("Какая погода в Новосибирске?", source)).resolves.toBe("В Новосибирске ясно, 12°C.");
+    await expect(agent.respond("Какая погода в Новосибирске?", { tools: source })).resolves.toBe(
+      "В Новосибирске ясно, 12°C.",
+    );
     expect(source.callTool).toHaveBeenCalledOnce();
     expect(source.callTool).toHaveBeenCalledWith({
       name: "get_current_weather",
@@ -105,7 +107,7 @@ describe("Agent выполняет ровно один tool call", () => {
       callTool: vi.fn().mockResolvedValue({ content: "Место не найдено.", isError: true } satisfies ToolResult),
     });
     const agent = new Agent({ complete }, "Инструкция");
-    await expect(agent.respond("Погода в Незнакогороде?", source)).resolves.toBe(
+    await expect(agent.respond("Погода в Незнакогороде?", { tools: source })).resolves.toBe(
       "Не удалось получить данные о погоде.",
     );
     const second = complete.mock.calls[1]?.[0] as ModelRequest;
@@ -118,7 +120,7 @@ describe("Agent выполняет ровно один tool call", () => {
       calls: [{ id: "call-1", name: "unknown_tool", arguments: {} }],
     } satisfies ModelCompletion);
     const source = fakeSource();
-    await expect(new Agent({ complete }, "").respond("Вопрос", source)).rejects.toMatchObject({
+    await expect(new Agent({ complete }, "").respond("Вопрос", { tools: source })).rejects.toMatchObject({
       code: "UNKNOWN_TOOL_CALL",
     });
     expect(source.callTool).not.toHaveBeenCalled();
@@ -133,7 +135,7 @@ describe("Agent выполняет ровно один tool call", () => {
       ],
     } satisfies ModelCompletion);
     const source = fakeSource();
-    await expect(new Agent({ complete }, "").respond("Вопрос", source)).rejects.toMatchObject({
+    await expect(new Agent({ complete }, "").respond("Вопрос", { tools: source })).rejects.toMatchObject({
       code: "TOOL_CALL_LIMIT_EXCEEDED",
       data: { limit: 1 },
     });
@@ -152,7 +154,7 @@ describe("Agent выполняет ровно один tool call", () => {
         calls: [{ id: "call-2", name: "get_current_weather", arguments: { location: "Томск" } }],
       } satisfies ModelCompletion);
     const source = fakeSource();
-    await expect(new Agent({ complete }, "").respond("Вопрос", source)).rejects.toMatchObject({
+    await expect(new Agent({ complete }, "").respond("Вопрос", { tools: source })).rejects.toMatchObject({
       code: "TOOL_CALL_LIMIT_EXCEEDED",
     });
     expect(source.callTool).toHaveBeenCalledOnce();
@@ -168,7 +170,7 @@ describe("Agent выполняет ровно один tool call", () => {
       } satisfies ModelCompletion)
       .mockResolvedValueOnce(textCompletion("  "));
     const source = fakeSource();
-    await expect(new Agent({ complete }, "").respond("Вопрос", source)).rejects.toMatchObject({
+    await expect(new Agent({ complete }, "").respond("Вопрос", { tools: source })).rejects.toMatchObject({
       code: "EMPTY_RESPONSE",
     });
   });
@@ -212,5 +214,60 @@ describe("Independence между репликами", () => {
       tools: [],
       toolChoice: "none",
     });
+  });
+});
+
+describe("Agent с историей диалога", () => {
+  const history = [
+    { role: "user", content: "Первый вопрос" },
+    { role: "assistant", content: "Первый ответ" },
+  ] as const;
+
+  it("отправляет system, затем историю в исходном порядке, затем текущий вопрос", async () => {
+    const complete = vi.fn().mockResolvedValue(textCompletion("Ответ"));
+    await new Agent({ complete }, "Инструкция").respond("Второй вопрос", { history });
+    const request = complete.mock.calls[0]?.[0] as ModelRequest;
+    expect(request.messages).toEqual([
+      { role: "system", content: "Инструкция" },
+      { role: "user", content: "Первый вопрос" },
+      { role: "assistant", content: "Первый ответ" },
+      { role: "user", content: "Второй вопрос" },
+    ]);
+  });
+
+  it("следующий respond() без history не содержит сообщений предыдущего", async () => {
+    const complete = vi.fn().mockResolvedValue(textCompletion("Ответ"));
+    const agent = new Agent({ complete }, "Инструкция");
+    await agent.respond("Второй вопрос", { history });
+    await agent.respond("Третий вопрос");
+    const request = complete.mock.calls[1]?.[0] as ModelRequest;
+    expect(request.messages).toEqual([
+      { role: "system", content: "Инструкция" },
+      { role: "user", content: "Третий вопрос" },
+    ]);
+  });
+
+  it("tool-раунд добавляет сообщения после текущего вопроса и не дублирует историю", async () => {
+    const complete = vi
+      .fn()
+      .mockResolvedValueOnce({
+        type: "tool_calls",
+        calls: [{ id: "call-1", name: weatherTool.name, arguments: { location: "Омск" } }],
+      })
+      .mockResolvedValueOnce(textCompletion("Ясно."));
+    const agent = new Agent({ complete }, "Инструкция");
+    await agent.respond("Погода?", { history, tools: fakeSource() });
+    const request = complete.mock.calls[1]?.[0] as ModelRequest;
+    const { messages } = request;
+    expect(messages.map((message) => message.role)).toEqual([
+      "system",
+      "user",
+      "assistant",
+      "user",
+      "assistant",
+      "tool",
+    ]);
+    expect(messages[3]).toEqual({ role: "user", content: "Погода?" });
+    expect(messages.filter((message) => message.content === "Первый вопрос")).toHaveLength(1);
   });
 });

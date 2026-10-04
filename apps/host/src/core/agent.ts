@@ -1,10 +1,12 @@
 import { AgentError } from "./errors.ts";
-import type { Message, ModelPort } from "./model.ts";
+import type { DialogMessage, Message, ModelPort } from "./model.ts";
 import type { ToolCall, ToolDefinition, ToolSource } from "./tool.ts";
 
 const DEFAULT_MAX_TOOL_CALLS_PER_TURN = 1;
 
 export type AgentOptions = Readonly<{ maxToolCalls?: number }>;
+/** `history` — прошлые реплики диалога; Agent их не хранит, их передаёт вызывающий. */
+export type RespondOptions = Readonly<{ tools?: ToolSource; history?: readonly DialogMessage[] }>;
 
 function requireMaxToolCalls(maxToolCalls: number | undefined): number {
   if (maxToolCalls === undefined) return DEFAULT_MAX_TOOL_CALLS_PER_TURN;
@@ -25,13 +27,15 @@ export class Agent {
     this.#maxToolCalls = requireMaxToolCalls(options.maxToolCalls);
   }
 
-  async respond(input: string, toolSource?: ToolSource): Promise<string> {
+  async respond(input: string, options: RespondOptions = {}): Promise<string> {
     const question = input.trim();
     if (!question) throw new AgentError("EMPTY_INPUT");
 
+    const toolSource = options.tools;
     const tools = toolSource ? await toolSource.listTools() : [];
     const messages: Message[] = [
       { role: "system", content: this.#systemPrompt },
+      ...(options.history ?? []),
       { role: "user", content: question },
     ];
     let used = 0;

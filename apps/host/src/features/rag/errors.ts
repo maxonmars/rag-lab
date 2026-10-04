@@ -15,6 +15,8 @@ export type RagErrorCode =
   | "INDEX_MODEL_MISMATCH"
   | "QUESTIONS_NOT_FOUND"
   | "QUESTIONS_INVALID"
+  | "SCENARIOS_NOT_FOUND"
+  | "SCENARIOS_INVALID"
   | "INVALID_RETRIEVAL_PARAMS"
   | "REWRITE_INVALID";
 
@@ -47,17 +49,33 @@ const invalidQuestions: Record<string, string> = {
   source: "источник не найден в индексе",
 };
 
+const invalidScenarios: Record<string, string> = {
+  empty: "нет ни одного раздела «## sN. Название»",
+  heading: "заголовок раздела должен иметь вид «## sN. Название»",
+  goal: "нет строки «Цель:»",
+  goalKeys: "нет строки «Ключи цели:»",
+  messages: "нет нумерованных реплик после «Реплики:»",
+  memory: "в «Памяти» нужны строки «- N: ключ», где N — номер реплики",
+  duplicate: "идентификатор повторяется",
+};
+
 const invalidRetrievalParams: Record<string, string> = {
   candidateTopK: "rag.candidateTopK должен быть целым числом от 1 до 20.",
   topK: "rag.topK должен быть целым числом от 1 до 20.",
   order: "rag.topK не должен превышать rag.candidateTopK.",
   threshold: "rag.similarityThreshold должен быть числом от -1 до 1.",
+  historyTurns: "rag.historyTurns должен быть целым числом от 1 до 20.",
 };
 
 const invalidRewrite: Record<string, string> = {
   multiline: "запрос занимает несколько строк",
   fence: "запрос обёрнут в Markdown-забор",
 };
+
+function describeInvalidScenarios(data: RagError["data"]): string {
+  const reason = invalidScenarios[String(data.reason)] ?? "неизвестная причина";
+  return `Некорректный файл сценариев диалога: ${reason}${data.id === undefined ? "" : ` (${data.id})`}.`;
+}
 
 function describeInvalidQuestions(data: RagError["data"]): string {
   const reason = invalidQuestions[String(data.reason)] ?? "неизвестная причина";
@@ -102,6 +120,10 @@ export function describeRagError(error: RagError): string {
       return "Файл контрольных вопросов не найден. Проверьте rag.questionsFile.";
     case "QUESTIONS_INVALID":
       return describeInvalidQuestions(data);
+    case "SCENARIOS_NOT_FOUND":
+      return "Файл сценариев диалога не найден. Проверьте rag.dialogFile.";
+    case "SCENARIOS_INVALID":
+      return describeInvalidScenarios(data);
     case "INVALID_RETRIEVAL_PARAMS":
       return invalidRetrievalParams[String(data.reason)] ?? "Параметры поиска несовместимы.";
     case "REWRITE_INVALID":

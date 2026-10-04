@@ -2,9 +2,9 @@ import type { CitationMetrics, CitationResult } from "./citationMetrics.ts";
 import { describeCitationProblem, renderCitedAnswer } from "./citationRender.ts";
 import { citationProblems } from "./citations.ts";
 import { stageTotalMs } from "./evalMetrics.ts";
-import { filesList, quoteBlock, seconds, tableCell } from "./format.ts";
+import { filesList, outOf, quoteBlock, seconds, tableCell } from "./format.ts";
 import { type RetrievalMode, type RetrievalParams, usesFilter } from "./retrieval.ts";
-import type { SearchIndex } from "./search.ts";
+import type { SearchHit, SearchIndex } from "./search.ts";
 import type { Strategy } from "./types.ts";
 
 export type CitationReportData = Readonly<{
@@ -19,8 +19,6 @@ export type CitationReportData = Readonly<{
   results: readonly CitationResult[];
   metrics: CitationMetrics;
 }>;
-
-const outOf = (part: number, whole: number): string => (whole === 0 ? "—" : `${part} из ${whole}`);
 
 function header(data: CitationReportData): string[] {
   const { index, params, mode } = data;
@@ -101,12 +99,13 @@ function questionTable(data: CitationReportData): string[] {
   ];
 }
 
-function fragmentTable({ result }: CitationResult): string[] {
-  if (result.hits.length === 0) return ["Контекст пуст: модель не вызывалась."];
+/** Таблица фрагментов, переданных модели, с `chunk_id`; пустой список — «Контекст пуст». */
+export function fragmentTable(hits: readonly SearchHit[]): string[] {
+  if (hits.length === 0) return ["Контекст пуст: модель не вызывалась."];
   return [
     "| Фрагмент | Сходство | Файл | Разделы | chunk_id |",
     "|---|---|---|---|---|",
-    ...result.hits.map(
+    ...hits.map(
       ({ rank, score, chunk }) =>
         `| ${rank} | ${score.toFixed(3)} | \`${chunk.file}\` | ${tableCell(chunk.sections.join("; "))} | \`${chunk.chunk_id}\` |`,
     ),
@@ -126,7 +125,7 @@ function questionSection(row: CitationResult): string[] {
     "",
     "### Переданные фрагменты",
     "",
-    ...fragmentTable(row),
+    ...fragmentTable(result.hits),
     "",
     "### Ответ",
     "",

@@ -1,12 +1,14 @@
 import { CliView, runCli, type Terminal } from "../adapters/cli/index.ts";
 import { DeepSeekModel, type DeepSeekOptions } from "../adapters/llm/index.ts";
 import type { ModelPort } from "../core/index.ts";
+import { type Dialog, EMPTY_DIALOG } from "../features/rag/index.ts";
 import { createAskHandler } from "./ask.ts";
 import { createCommands } from "./commands.ts";
 import { parseOptions, type ResolvedConfig, resolveConfig, showConfig } from "./config.ts";
 import type { CreateEmbeddings } from "./embeddings.ts";
 import { createRagHandlers } from "./rag.ts";
 import { createRagAnswerHandlers, modeLines } from "./ragAnswer.ts";
+import { createRagChatHandlers, stateLines } from "./ragChat.ts";
 
 export type RunOptions = Readonly<{
   argv: readonly string[];
@@ -25,7 +27,9 @@ export async function run(options: RunOptions): Promise<number> {
   const { cwd, createEmbeddings } = options;
   const rag = createRagHandlers({ cwd, getConfig, view, createEmbeddings });
   const ragAnswer = createRagAnswerHandlers({ cwd, getConfig, createModel, createEmbeddings, view });
+  const ragChat = createRagChatHandlers({ cwd, getConfig, createModel, createEmbeddings, view });
   let ragMode = false;
+  let dialog: Dialog = EMPTY_DIALOG;
   const commands = createCommands({
     ask: createAskHandler({ createModel, getConfig }),
     config: () => showConfig(config),
@@ -33,6 +37,16 @@ export async function run(options: RunOptions): Promise<number> {
     ragCompare: rag.compare,
     ragCalibrate: rag.calibrate,
     ragAsk: ragAnswer.ask,
+    ragChat: async (text) => {
+      const result = await ragChat.chat(dialog, text);
+      dialog = result.dialog;
+      return result.reply;
+    },
+    ragState: () => stateLines(dialog),
+    ragReset: () => {
+      dialog = EMPTY_DIALOG;
+      return ["Диалог и память задачи сброшены."];
+    },
     ragMode: () => ragMode,
     setRagMode: (enabled) => {
       ragMode = enabled;
@@ -40,6 +54,7 @@ export async function run(options: RunOptions): Promise<number> {
     },
     ragEval: ragAnswer.evaluate,
     ragCitations: ragAnswer.citations,
+    ragDialog: ragChat.dialogs,
     view,
   });
   let command: string[];

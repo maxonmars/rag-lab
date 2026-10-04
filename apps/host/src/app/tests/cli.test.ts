@@ -64,7 +64,7 @@ describe("CLI и REPL", () => {
     const result = await invoke([], { cwd, input: "Вопрос\n/exit\n", interactive: true });
     expect(result.output.match(/── rag-lab ──/g)).toHaveLength(1);
     expect(result.output).toContain(
-      "/ask · /help · /config show · /rag index · /rag compare · /rag calibrate · /rag ask · /rag on · /rag off · /rag eval · /rag citations · /exit",
+      "/ask · /help · /config show · /rag index · /rag compare · /rag calibrate · /rag ask · /rag on · /rag off · /rag eval · /rag citations · /rag dialog · /rag state · /rag reset · /exit",
     );
     expect(result.output.match(/rag-lab > /g)).toHaveLength(2);
   });

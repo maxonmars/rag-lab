@@ -14,7 +14,7 @@ export function answerPlain(model: ModelPort, text: string): Promise<string> {
   return new Agent(model, systemPrompt()).respond(text);
 }
 
-/** Реплика без поиска и без истории; в режиме RAG команду `ask` обслуживает ragAnswer.ts. */
+/** Реплика без поиска и без истории; в режиме RAG команду `ask` обслуживает ragChat.ts. */
 export function createAskHandler(options: AskHandlerOptions): (text: string) => Promise<string> {
   return (text) => answerPlain(createConfiguredModel(options.getConfig(), options.createModel), text);
 }
