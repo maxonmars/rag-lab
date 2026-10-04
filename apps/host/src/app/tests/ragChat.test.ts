@@ -92,11 +92,17 @@ describe("REPL: чат с RAG", () => {
     const roles = second?.messages.map((message) => message.role);
     expect(roles).toEqual(["system", "user", "assistant", "user"]);
     expect(second?.messages[1]?.content).toBe("вопрос 1");
-    expect(second?.messages[2]?.content).toContain("Документ повторяет слово.\n\nИсточники: `a.md`");
+    expect(second?.messages[2]?.content).toBe(
+      "## Ответ\n\nДокумент повторяет слово [1].\n\n## Источники\n\n- [1] `a.md` › Один\n\n## Цитаты\n\n- [1] «слово слово слово слово слово»",
+    );
     expect(String(second?.messages[3]?.content)).toContain("## Память задачи");
     expect(result.output.match(/── Ответ агента · RAG-чат ──/g)).toHaveLength(2);
     expect(result.output).toContain("Источники:");
     expect(result.output).toContain("Цель: изучить слово");
+    expect(result.output).toContain(
+      "Память: добавлено\n  + цель: изучить слово\n  + уточнение: пользователь спрашивает про документ",
+    );
+    expect(result.output).toContain("Память: без изменений");
     expect(result.output).toContain("── Память задачи ──\n\nХодов: 2\n\n## Цель\n\nизучить слово");
     expect(result.output.split("── Память задачи ──").at(-1)).toContain("Память задачи пуста.");
   });

@@ -46,10 +46,15 @@ export class CliView {
     this.#ragBlock("Ответ агента · RAG", text, fragments, []);
   }
 
-  /** Ответ RAG-чата: как `ragAnswer`, плюс цель из памяти задачи; пустая цель — «не зафиксирована». */
-  chatAnswer(text: string, fragments: readonly string[], goal: string): void {
-    const label = this.#paint("key", "Цель:");
-    this.#ragBlock("Ответ агента · RAG-чат", text, fragments, [`${label} ${goal === "" ? "не зафиксирована" : goal}`]);
+  /** Ответ RAG-чата: как `ragAnswer`, плюс цель и пункты, добавленные в память задачи этим ходом; пустая цель — «не зафиксирована». */
+  chatAnswer(text: string, fragments: readonly string[], goal: string, remembered: readonly string[]): void {
+    const footer = [`${this.#paint("key", "Цель:")} ${goal === "" ? "не зафиксирована" : goal}`];
+    const label = this.#paint("key", "Память:");
+    footer.push(
+      remembered.length > 0 ? `${label} добавлено` : `${label} без изменений`,
+      ...remembered.map((line) => `  + ${line}`),
+    );
+    this.#ragBlock("Ответ агента · RAG-чат", text, fragments, footer);
   }
 
   taskState(lines: readonly string[]): void {

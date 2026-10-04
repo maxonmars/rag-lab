@@ -33,23 +33,30 @@ function turn(question: string, answer: CitedAnswer): DialogTurn {
 const dialogOf = (...turns: DialogTurn[]): Dialog => ({ state: EMPTY_TASK_STATE, turns });
 
 describe("assistantHistoryText", () => {
-  it("убирает [N] и пробел перед ними, источники раскрывает в файл и раздел без дублей", () => {
-    const answer = answered("Слои [1] такие [2], и так [1].", [
-      { fragment: 1, hit: HIT_A },
-      { fragment: 2, hit: HIT_B },
-      { fragment: 3, hit: HIT_A },
-      { fragment: 9, hit: undefined },
-    ]);
+  it("ответ — разделы «Ответ», «Источники» с файлом и разделом, «Цитаты»; [N] сохраняются", () => {
+    const answer: Answer = {
+      kind: "answer",
+      text: "Слои [1] такие [2].",
+      problems: [],
+      raw: "",
+      sources: [
+        { fragment: 1, hit: HIT_A },
+        { fragment: 2, hit: HIT_B },
+        { fragment: 9, hit: undefined },
+      ],
+      quotes: [{ fragment: 1, text: "цитата", hit: HIT_A, verified: true }],
+    };
     expect(assistantHistoryText(answer)).toBe(
-      "Слои такие, и так.\n\nИсточники: `a.md` › Doc › a.md; `b.md` › Doc › b.md",
+      "## Ответ\n\nСлои [1] такие [2].\n\n## Источники\n\n- [1] `a.md` › Doc › a.md\n- [2] `b.md` › Doc › b.md\n- [9]\n\n## Цитаты\n\n- [1] «цитата»",
     );
   });
 
-  it("ответ без раскрытых источников — «Источники: нет»", () => {
-    expect(assistantHistoryText(answered("Текст."))).toBe("Текст.\n\nИсточники: нет");
+  it("ответ с нарушением формата — только текст до первого заголовка второго уровня", () => {
+    const raw = "Текст [1].\n\n## Источники\n\n- [1]\n\n## Цитаты\n\n- [1] «цитата»";
+    expect(assistantHistoryText(answered(raw))).toBe("## Ответ\n\nТекст [1].");
   });
 
-  it("отказ модели несёт текст и уточнение; без уточнения — только текст", () => {
+  it("отказ модели — разделы «Не знаю» и «Уточнение»; без уточнения — только «Не знаю»", () => {
     const refusal = {
       kind: "unknown",
       by: "model",
@@ -58,13 +65,13 @@ describe("assistantHistoryText", () => {
       problems: [],
       raw: "",
     } as const;
-    expect(assistantHistoryText(refusal)).toBe("Не знаю. Нет сведений.\n\nУточнение: О чём речь?");
-    expect(assistantHistoryText({ ...refusal, clarification: "" })).toBe("Не знаю. Нет сведений.");
+    expect(assistantHistoryText(refusal)).toBe("## Не знаю\n\nНет сведений.\n\n## Уточнение\n\nО чём речь?");
+    expect(assistantHistoryText({ ...refusal, clarification: "" })).toBe("## Не знаю\n\nНет сведений.");
   });
 
   it("отказ по отбору — фиксированная фраза без порога и ближайших разделов", () => {
     const refusal = { kind: "unknown", by: "retrieval", threshold: 0.55, nearest: [HIT_A] } as const;
-    expect(assistantHistoryText(refusal)).toBe("Не знаю: в документации не найдено фрагментов по этому вопросу.");
+    expect(assistantHistoryText(refusal)).toBe("## Не знаю\n\nВ документации не найдено фрагментов по этому вопросу.");
   });
 });
 
@@ -81,9 +88,9 @@ describe("historyMessages", () => {
     const messages = historyMessages(dialogOf(first, second, third), 2);
     expect(messages.map((message) => message.content)).toEqual([
       "Второй",
-      "Два.\n\nИсточники: нет",
+      "## Ответ\n\nДва.",
       "Третий",
-      "Три.\n\nИсточники: нет",
+      "## Ответ\n\nТри.",
     ]);
     expect(messages.map((message) => message.role)).toEqual(["user", "assistant", "user", "assistant"]);
   });
