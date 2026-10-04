@@ -26,3 +26,5 @@ export function quoteBlock(text: string): string[] {
 
 export const filesList = (files: readonly string[]): string =>
   files.length > 0 ? files.map((file) => `\`${file}\``).join(", ") : "—";
+
+export const outOf = (part: number, whole: number): string => (whole === 0 ? "—" : `${part} из ${whole}`);

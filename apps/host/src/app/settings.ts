@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { MAX_TOP_K, RETRIEVAL_MODES, SIMILARITY_RANGE, STRATEGIES } from "../features/rag/index.ts";
+import { MAX_HISTORY_TURNS, MAX_TOP_K, RETRIEVAL_MODES, SIMILARITY_RANGE, STRATEGIES } from "../features/rag/index.ts";
 import { sections } from "./markdown.ts";
 
 const descriptions = sections(new URL("./settings.md", import.meta.url));
@@ -31,6 +31,12 @@ export const settings = {
   "rag.questionsFile": {
     schema: z.string().trim().min(1),
     default: "experiments/feod-retrieval/questions.md",
+    type: "string",
+  },
+  "rag.historyTurns": { schema: z.number().int().min(1).max(MAX_HISTORY_TURNS), default: 6, type: "number" },
+  "rag.dialogFile": {
+    schema: z.string().trim().min(1),
+    default: "experiments/feod-chat/scenarios.md",
     type: "string",
   },
 } as const;

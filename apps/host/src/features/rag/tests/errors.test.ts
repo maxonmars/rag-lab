@@ -35,6 +35,7 @@ const CASES: readonly [RagErrorCode, Record<string, string | number>, string][] 
   ["INVALID_RETRIEVAL_PARAMS", { reason: "topK" }, "rag.topK должен быть целым числом от 1 до 20."],
   ["INVALID_RETRIEVAL_PARAMS", { reason: "order" }, "rag.topK не должен превышать rag.candidateTopK."],
   ["INVALID_RETRIEVAL_PARAMS", { reason: "threshold" }, "rag.similarityThreshold должен быть числом от -1 до 1."],
+  ["INVALID_RETRIEVAL_PARAMS", { reason: "historyTurns" }, "rag.historyTurns должен быть целым числом от 1 до 20."],
   ["INVALID_RETRIEVAL_PARAMS", { reason: "other" }, "Параметры поиска несовместимы."],
   ["REWRITE_INVALID", { reason: "multiline" }, "некорректный поисковый запрос: запрос занимает несколько строк."],
   ["REWRITE_INVALID", { reason: "fence" }, "некорректный поисковый запрос: запрос обёрнут в Markdown-забор."],

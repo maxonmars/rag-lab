@@ -1,5 +1,15 @@
 export { answerWithRag, type RagAnswer, type StageTimings } from "./answer.ts";
 export { type CalibrationOptions, type CalibrationResult, calibrateThreshold } from "./calibration.ts";
+export { type Dialog, type DialogTurn, EMPTY_DIALOG, MAX_HISTORY_TURNS } from "./chat/dialog.ts";
+export {
+  type DialogEvalOptions,
+  type DialogEvalResult,
+  type DialogProgress,
+  evaluateDialogs,
+} from "./chat/dialogEval.ts";
+export type { ScenarioMetrics } from "./chat/dialogMetrics.ts";
+export { renderTaskState, type TaskState } from "./chat/taskState.ts";
+export { type ChatTurnResult, chatTurn } from "./chat/turn.ts";
 export {
   type CitationEvalOptions,
   type CitationEvalResult,

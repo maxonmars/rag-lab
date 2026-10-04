@@ -1,4 +1,5 @@
-import { Agent, AgentError, type ModelPort } from "../../core/index.ts";
+import { Agent, AgentError, type DialogMessage, type ModelPort } from "../../core/index.ts";
+import type { TaskState } from "./chat/taskState.ts";
 import { type CitedAnswer, parseCitedAnswer, retrievalRefusal } from "./citations.ts";
 import { renderRagMessage } from "./context.ts";
 import { readPrompt } from "./prompts.ts";
@@ -45,6 +46,8 @@ export type GenerationOptions = Readonly<{
   selection: Selection;
   /** Порог режима с фильтром; `null` — режим без порога. */
   threshold: number | null;
+  /** Чат: память задачи и история уходят модели вместе с вопросом; без него ответ одиночный. */
+  chat?: Readonly<{ memory: TaskState; history: readonly DialogMessage[] }>;
 }>;
 
 /**
@@ -56,9 +59,13 @@ export async function generateAnswer(
 ): Promise<Readonly<{ answer: CitedAnswer; contextChars: number }>> {
   const { hits } = options.selection;
   if (hits.length === 0) return { answer: retrievalRefusal(options.selection, options.threshold), contextChars: 0 };
-  const message = renderRagMessage(options.question, hits);
-  const instruction = readPrompt("answer.md");
-  const raw = await new Agent(options.model, `${options.systemPrompt}\n\n${instruction}`).respond(message);
+  const { chat } = options;
+  const message = renderRagMessage(options.question, hits, chat?.memory);
+  const instruction = [options.systemPrompt, readPrompt("answer.md"), ...(chat ? [readPrompt("chat.md")] : [])];
+  const raw = await new Agent(options.model, instruction.join("\n\n")).respond(
+    message,
+    chat ? { history: chat.history } : {},
+  );
   return { answer: parseCitedAnswer(raw, hits), contextChars: [...message].length };
 }
 

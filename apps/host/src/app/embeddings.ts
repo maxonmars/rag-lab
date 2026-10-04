@@ -23,7 +23,9 @@ export type RagPaths = Readonly<{
   evalFile: string;
   calibrationFile: string;
   citationsFile: string;
+  dialogReportFile: string;
   questionsFile: string;
+  dialogFile: string;
 }>;
 
 export function ragPaths(cwd: string, config: ResolvedConfig): RagPaths {
@@ -36,6 +38,8 @@ export function ragPaths(cwd: string, config: ResolvedConfig): RagPaths {
     evalFile: join(outputDir, "rag-eval.md"),
     calibrationFile: join(outputDir, "rag-calibration.md"),
     citationsFile: join(outputDir, "rag-citations.md"),
+    dialogReportFile: join(outputDir, "rag-dialog.md"),
     questionsFile: resolve(cwd, values["rag.questionsFile"]),
+    dialogFile: resolve(cwd, values["rag.dialogFile"]),
   };
 }

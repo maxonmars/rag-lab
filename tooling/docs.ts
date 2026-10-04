@@ -11,28 +11,39 @@ const silentView = {
   comparisonSaved: () => {},
   calibrationSaved: () => {},
   ragAnswer: () => {},
+  chatAnswer: () => {},
+  taskState: () => {},
   ragMode: () => {},
   evalSaved: () => {},
 };
 
-export function generatedDocs(): Record<string, string> {
-  const cell = (value: unknown) => String(value).replaceAll("|", "\\|").replaceAll("\n", " ");
-  const settings = settingEntries.map((entry) => {
-    return `| ${entry.key} | ${entry.type} | ${entry.secret ? "—" : cell(entry.default)} | ${entry.env} | ${entry.secret ? "—" : entry.flag} | ${cell(entry.description)} |`;
-  });
-  const registry = createCommands({
+/** Реестр с заглушками обработчиков: нужны только имена, аргументы и описания команд. */
+function stubRegistry() {
+  return createCommands({
     ask: async () => "",
     config: () => [],
     ragIndex: async () => ({ lines: [], path: "" }),
     ragCompare: async () => ({ lines: [], path: "" }),
     ragCalibrate: async () => ({ lines: [], path: "" }),
     ragAsk: async () => ({ answer: "", fragments: [] }),
+    ragChat: async () => ({ answer: "", fragments: [], goal: "" }),
+    ragState: () => [],
+    ragReset: () => [],
     ragMode: () => false,
     setRagMode: () => [],
     ragEval: async () => ({ lines: [], path: "" }),
     ragCitations: async () => ({ lines: [], path: "" }),
+    ragDialog: async () => ({ lines: [], path: "" }),
     view: silentView,
   });
+}
+
+export function generatedDocs(): Record<string, string> {
+  const cell = (value: unknown) => String(value).replaceAll("|", "\\|").replaceAll("\n", " ");
+  const settings = settingEntries.map((entry) => {
+    return `| ${entry.key} | ${entry.type} | ${entry.secret ? "—" : cell(entry.default)} | ${entry.env} | ${entry.secret ? "—" : entry.flag} | ${cell(entry.description)} |`;
+  });
+  const registry = stubRegistry();
   const commands = registry.map(
     (command) =>
       `| ${[command.name, ...command.arguments].join(" ")} | /${command.name} | ${cell(command.description)} |`,

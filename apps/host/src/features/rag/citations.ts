@@ -1,4 +1,5 @@
 import type { SearchHit } from "./search.ts";
+import { bodyOf, type Section, splitSections } from "./sections.ts";
 import type { Selection } from "./select.ts";
 
 /** Минимальная длина цитаты, кодовые точки нормализованного текста. */
@@ -40,8 +41,6 @@ export type CitedAnswer =
     }>
   | Readonly<{ kind: "unknown"; by: "retrieval"; threshold: number | null; nearest: readonly SearchHit[] }>;
 
-type Section = Readonly<{ heading: string; body: string }>;
-
 const ANSWER_HEADINGS: readonly string[] = ["Ответ", "Источники", "Цитаты"];
 const REFUSAL_HEADINGS: readonly string[] = ["Не знаю", "Уточнение"];
 const SOURCE_LINE = /^\s*[-*]\s*\[(\d+)\]/;
@@ -61,20 +60,6 @@ export function normalizeQuote(text: string): string {
     .replace(/\s+/g, " ")
     .trim();
 }
-
-function splitSections(raw: string): Section[] {
-  return raw
-    .replaceAll("\r\n", "\n")
-    .split(/^## /m)
-    .slice(1)
-    .map((section) => {
-      const [heading = "", ...lines] = section.split("\n");
-      return { heading: heading.trim(), body: lines.join("\n").trim() };
-    });
-}
-
-const bodyOf = (sections: readonly Section[], heading: string): string =>
-  sections.find((section) => section.heading === heading)?.body ?? "";
 
 const findHit = (hits: readonly SearchHit[], fragment: number): SearchHit | undefined =>
   hits.find((hit) => hit.rank === fragment);

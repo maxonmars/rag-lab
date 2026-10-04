@@ -47,6 +47,7 @@ export function modeLines(enabled: boolean, config: ResolvedConfig): string[] {
   return [
     `Ответы с RAG: стратегия ${values["rag.chunkStrategy"]}, режим ${mode}, ${limits}${threshold}.`,
     "Обычные строки и /ask ищут по индексу.",
+    `Ответы учитывают историю (последние ${values["rag.historyTurns"]} ходов) и память задачи; /rag state показывает память, /rag reset сбрасывает диалог.`,
   ];
 }
 
@@ -81,17 +82,19 @@ function citationLines(result: CitationEvalResult, mode: RetrievalMode): string[
   ];
 }
 
+// Параметры проверяются первыми, модель создаётся до индекса: ошибка ключа приходит раньше, чем обращение к Ollama.
+export async function prepareRag(options: RagAnswerHandlerOptions) {
+  const config = options.getConfig();
+  const retrieval = retrievalSettings(config);
+  const paths = ragPaths(options.cwd, config);
+  const model = createConfiguredModel(config, options.createModel);
+  const embeddings = configuredEmbeddings(config, options.createEmbeddings);
+  const index = await openIndex({ indexFile: paths.indexFile, embeddings });
+  return { values: config.values, paths, model, index, retrieval };
+}
+
 export function createRagAnswerHandlers(options: RagAnswerHandlerOptions) {
-  // Параметры проверяются первыми, модель создаётся до индекса: ошибка ключа приходит раньше, чем обращение к Ollama.
-  async function prepare() {
-    const config = options.getConfig();
-    const retrieval = retrievalSettings(config);
-    const paths = ragPaths(options.cwd, config);
-    const model = createConfiguredModel(config, options.createModel);
-    const embeddings = configuredEmbeddings(config, options.createEmbeddings);
-    const index = await openIndex({ indexFile: paths.indexFile, embeddings });
-    return { values: config.values, paths, model, index, retrieval };
-  }
+  const prepare = () => prepareRag(options);
 
   return {
     async ask(text: string): Promise<RagReply> {

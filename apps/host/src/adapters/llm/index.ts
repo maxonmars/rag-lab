@@ -8,6 +8,7 @@ import type {
 } from "openai/resources/chat/completions";
 import {
   AgentError,
+  type AssistantToolCallMessage,
   type JsonObject,
   type Message,
   type ModelCompletion,
@@ -59,8 +60,11 @@ export class DeepSeekModel implements ModelPort {
   }
 }
 
+const hasToolCalls = (message: Message): message is AssistantToolCallMessage =>
+  message.role === "assistant" && "toolCalls" in message;
+
 function toWireMessage(message: Message): ChatCompletionMessageParam {
-  if (message.role === "assistant") {
+  if (hasToolCalls(message)) {
     return { role: "assistant", content: message.content, tool_calls: message.toolCalls.map(toWireToolCall) };
   }
   if (message.role === "tool") return { role: "tool", content: message.content, tool_call_id: message.toolCallId };

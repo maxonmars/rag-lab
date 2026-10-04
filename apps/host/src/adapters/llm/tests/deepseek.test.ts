@@ -109,6 +109,23 @@ describe("DeepSeek adapter: tool calling", () => {
     expect(body.messages[3]).toEqual({ role: "tool", tool_call_id: "call-1", content: "Ясно, 12°C" });
   });
 
+  it("assistant-реплика истории уходит обычным текстом, без tool_calls", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(textResponse("Ответ"));
+    const model = new DeepSeekModel({ ...options, fetch });
+    await model.complete({
+      messages: [
+        { role: "system", content: "Инструкция" },
+        { role: "user", content: "Первый вопрос" },
+        { role: "assistant", content: "Первый ответ" },
+        { role: "user", content: "Второй вопрос" },
+      ],
+      tools: [],
+      toolChoice: "none",
+    });
+    const body = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(body.messages[2]).toEqual({ role: "assistant", content: "Первый ответ" });
+  });
+
   it.each(["not-json", "null", "[1,2]"])("отклоняет некорректные arguments: %s", async (args) => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
       response({

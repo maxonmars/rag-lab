@@ -7,7 +7,8 @@ FEOD (32 файла, около 174 тыс. символов) режется н�
 DeepSeek; ответы без RAG и с RAG сравниваются на 10 контрольных вопросах. Третье — порог релевантности и переписывание
 запроса: кандидаты фильтруются по cosine similarity, запрос для поиска переписывает DeepSeek, четыре режима поиска
 сравниваются на 15 вопросах. Четвёртое — источники, цитаты и режим «не знаю»: ответ содержит источники и проверенные
-цитаты, а при пустом отборе по порогу модель не вызывается; формат проверяется на 10 вопросах. Каркас взят из mcp-lab
+цитаты, а при пустом отборе по порогу модель не вызывается; формат проверяется на 10 вопросах. Пятое — мини-чат с RAG:
+в режиме `/rag on` реплики идут с историей и памятью задачи, `rag dialog` прогоняет два сценария. Каркас взят из mcp-lab
 ([ADR 0001](docs/adr/0001-repository-foundation.md)).
 
 ## Запуск
@@ -27,7 +28,7 @@ npm run dev -- rag compare
 `corpus:feod` клонирует feod-docs в `.local/rag/source`, переключает на закреплённый коммит и собирает 32 документа в
 `.local/rag/corpus`. Ollama должна быть запущена (`ollama serve`); `rag index` печатает ход по стратегиям в stderr.
 Результаты — `.local/rag/index.json` и `.local/rag/comparison.md` (каталог `.local/` не попадает в git).
-Ключ DeepSeek нужен для `ask`, `rag ask`, `rag eval` и `rag citations`: `LAB_LLM_API_KEY` в корневом `.env` или окружении процесса.
+Ключ DeepSeek нужен для `ask`, `rag ask`, `rag eval`, `rag citations` и `rag dialog`: `LAB_LLM_API_KEY` в корневом `.env` или окружении процесса.
 `rag calibrate` ключа не требует.
 
 ```sh
@@ -61,7 +62,8 @@ npm run dev
 `rag eval` всегда сравнивает четыре режима на вопросах `rag.questionsFile` и пишет `.local/rag/rag-eval.md`.
 `rag citations` прогоняет те же вопросы в режиме `rag.retrievalMode` и пишет `.local/rag/rag-citations.md` с проверкой
 цитат. В REPL:
-`/rag on`, вопрос, `/rag off`, тот же вопрос.
+`/rag on` включает чат с историей и памятью задачи (`/rag state`, `/rag reset`), `/rag off` возвращает ответы без RAG; `rag dialog`
+прогоняет сценарии чата и пишет `.local/rag/rag-dialog.md`.
 
 Настройки — YAML-файл, env (`LAB_RAG_…`) и флаги; приоритет и список — [docs/configuration.md](docs/configuration.md),
 команды — [docs/commands.md](docs/commands.md). Пример файла — [lab.config.example.yaml](lab.config.example.yaml).
@@ -72,12 +74,13 @@ npm run dev
 - [ADR 0003](docs/adr/0003-first-rag-query.md) — поиск, режим RAG, контрольные вопросы.
 - [ADR 0004](docs/adr/0004-relevance-filter-and-query-rewrite.md) — порог релевантности, rewrite, калибровка, сравнение режимов.
 - [ADR 0005](docs/adr/0005-citations-and-refusal.md) — источники, цитаты, проверка дословности, режим «не знаю».
+- [ADR 0006](docs/adr/0006-rag-chat-memory.md) — RAG-чат: история диалога, память задачи, сценарии проверки.
 - [Фича rag](apps/host/src/features/rag/README.md) — контракт, формат индекса, ограничения.
 - Демо [индексации](docs/demos/indexing.md), [RAG-запроса](docs/demos/rag-query.md),
-  [режимов поиска](docs/demos/retrieval-modes.md) и [цитат](docs/demos/citations.md), эксперименты
-  [feod-chunking](experiments/feod-chunking/README.md), [feod-rag](experiments/feod-rag/README.md),
-  [feod-retrieval](experiments/feod-retrieval/README.md) и [feod-citations](experiments/feod-citations/README.md) —
-  воспроизведение и выводы.
+  [режимов поиска](docs/demos/retrieval-modes.md), [цитат](docs/demos/citations.md) и [RAG-чата](docs/demos/rag-chat.md),
+  эксперименты [feod-chunking](experiments/feod-chunking/README.md), [feod-rag](experiments/feod-rag/README.md),
+  [feod-retrieval](experiments/feod-retrieval/README.md), [feod-citations](experiments/feod-citations/README.md) и
+  [feod-chat](experiments/feod-chat/README.md) — воспроизведение и выводы.
 - [Архитектура](ARCHITECTURE.md), [курс](docs/course.md), [правила для агентов](AGENTS.md).
 
 ## Проверки

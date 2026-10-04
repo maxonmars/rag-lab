@@ -153,8 +153,9 @@ describe("настройки поиска через YAML, env и CLI", () => {
       embeddings: embeddings(),
       complete,
     });
-    expect(complete).toHaveBeenCalledTimes(2);
-    expect(String(complete.mock.calls[0]?.[0].messages[0]?.content)).toContain("переписываешь");
+    expect(complete).toHaveBeenCalledTimes(3);
+    expect(String(complete.mock.calls[0]?.[0].messages[0]?.content)).toContain("обновляешь память задачи");
+    expect(String(complete.mock.calls[1]?.[0].messages[0]?.content)).toContain("переписываешь");
     const shown = fragments(result.output);
     expect(shown.length).toBeGreaterThan(0);
     expect(shown.every((line) => scoreOf(line) === "1.00")).toBe(true);

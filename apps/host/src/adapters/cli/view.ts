@@ -15,6 +15,8 @@ export type CommandView = Pick<
   | "comparisonSaved"
   | "calibrationSaved"
   | "ragAnswer"
+  | "chatAnswer"
+  | "taskState"
   | "ragMode"
   | "evalSaved"
 >;
@@ -41,9 +43,17 @@ export class CliView {
 
   /** Ответ с RAG: текст модели и под ним фрагменты, переданные модели; пустой список — контекст без фрагментов. */
   ragAnswer(text: string, fragments: readonly string[]): void {
-    const label = this.#paint("key", "Фрагменты:");
-    const listed = fragments.length > 0 ? [label, ...fragments.map((line) => `  ${line}`)] : [`${label} контекст пуст`];
-    this.#block("Ответ агента · RAG", [text, "", ...listed]);
+    this.#ragBlock("Ответ агента · RAG", text, fragments, []);
+  }
+
+  /** Ответ RAG-чата: как `ragAnswer`, плюс цель из памяти задачи; пустая цель — «не зафиксирована». */
+  chatAnswer(text: string, fragments: readonly string[], goal: string): void {
+    const label = this.#paint("key", "Цель:");
+    this.#ragBlock("Ответ агента · RAG-чат", text, fragments, [`${label} ${goal === "" ? "не зафиксирована" : goal}`]);
+  }
+
+  taskState(lines: readonly string[]): void {
+    this.#block("Память задачи", lines);
   }
 
   ragMode(lines: readonly string[]): void {
@@ -143,6 +153,12 @@ export class CliView {
       const notes = row.note ? wrapText(row.note, textWidth).map((line) => this.#paint("muted", line)) : [];
       return [`${label}${columnGap}${first}`, ...[...rest, ...notes].map((line) => `${indent}${line}`)];
     });
+  }
+
+  #ragBlock(title: string, text: string, fragments: readonly string[], footer: readonly string[]): void {
+    const label = this.#paint("key", "Фрагменты:");
+    const listed = fragments.length > 0 ? [label, ...fragments.map((line) => `  ${line}`)] : [`${label} контекст пуст`];
+    this.#block(title, [text, "", ...listed, ...footer]);
   }
 
   /** Блок начинается с пустой строки, чтобы в REPL отделяться от введённой реплики. */
