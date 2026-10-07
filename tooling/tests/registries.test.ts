@@ -20,6 +20,7 @@ it("настройки имеют уникальные ключи и произ�
 it("команды имеют уникальные имена и алиасы, описания, аргументы и обработчики", () => {
   const commands = createCommands({
     ask: async () => "",
+    modelLabel: () => "",
     config: () => [],
     ragIndex: async () => ({ lines: [], path: "" }),
     ragCompare: async () => ({ lines: [], path: "" }),

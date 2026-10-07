@@ -9,6 +9,7 @@ const descriptions = sections(new URL("./commands.md", import.meta.url));
 
 type CommandContext = {
   ask: (text: string) => Promise<string>;
+  modelLabel: () => string;
   config: () => readonly ConfigRow[];
   ragIndex: () => Promise<RagOutcome>;
   ragCompare: () => Promise<RagOutcome>;
@@ -74,7 +75,7 @@ function ragAnswerCommands(context: CommandContext): Command[] {
       description: descriptions["rag ask"] ?? "",
       run: async (args) => {
         const reply = await context.ragAsk(args.join(" "));
-        context.view.ragAnswer(reply.answer, reply.fragments);
+        context.view.ragAnswer(reply.answer, reply.fragments, context.modelLabel());
         return "continue";
       },
     },
@@ -145,8 +146,8 @@ function askCommand(context: CommandContext): Command {
       const text = args.join(" ");
       if (context.ragMode()) {
         const reply = await context.ragChat(text);
-        context.view.chatAnswer(reply.answer, reply.fragments, reply.goal, reply.remembered);
-      } else context.view.answer(await context.ask(text));
+        context.view.chatAnswer(reply.answer, reply.fragments, reply.goal, reply.remembered, context.modelLabel());
+      } else context.view.answer(await context.ask(text), context.modelLabel());
       return "continue";
     },
   };

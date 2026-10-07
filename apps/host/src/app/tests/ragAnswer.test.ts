@@ -47,7 +47,7 @@ describe("rag ask", () => {
       embeddings: fakeEmbeddings(),
     });
     expect(result.code).toBe(0);
-    expect(result.output).toContain("── Ответ агента · RAG ──");
+    expect(result.output).toContain("── Ответ агента · RAG · deepseek · deepseek-flash ──");
     expect(result.output).toContain("Фрагменты:");
     expect(result.output).toMatch(/\n {2}1\. [ab]\.md › /);
     const request = requestOf(result);
@@ -148,8 +148,8 @@ describe("режим сессии REPL", () => {
       "── Режим ──\n\nОтветы с RAG: стратегия structure, режим rewrite-filter, кандидатов 10, итоговый top-5, порог 0.55.",
     );
     expect(result.output).toContain("Ответы без RAG.");
-    expect(result.output.match(/── Ответ агента · RAG-чат ──/g)).toHaveLength(1);
-    expect(result.output).toContain("\n── Ответ агента ──\n\nОтвет: Вопрос два\n");
+    expect(result.output.match(/── Ответ агента · RAG-чат · deepseek · deepseek-flash ──/g)).toHaveLength(1);
+    expect(result.output).toContain("\n── Ответ агента · deepseek · deepseek-flash ──\n\nОтвет: Вопрос два\n");
     expect(result.complete).toHaveBeenCalledTimes(4);
     expect(requestOf(result, 0).messages[0]?.content).toContain("обновляешь память задачи");
     expect(requestOf(result, 1).messages[0]?.content).toContain("переписываешь");
@@ -166,15 +166,15 @@ describe("режим сессии REPL", () => {
       embeddings: fakeEmbeddings(),
       complete: echoWithRewrite(),
     });
-    expect(off.output).toContain("── Ответ агента ──");
-    expect(on.output).toContain("── Ответ агента · RAG-чат ──");
+    expect(off.output).toContain("── Ответ агента · deepseek · deepseek-flash ──");
+    expect(on.output).toContain("── Ответ агента · RAG-чат · deepseek · deepseek-flash ──");
   });
 
   it("режим не переносится между запусками CLI", async () => {
     const result = await invoke(["rag", "on"], { cwd });
     expect(result.output).toContain("Ответы с RAG");
     const next = await invoke(["ask", "Вопрос"], { cwd });
-    expect(next.output).toContain("── Ответ агента ──");
+    expect(next.output).toContain("── Ответ агента · deepseek · deepseek-flash ──");
     expect(next.createEmbeddings).not.toHaveBeenCalled();
   });
 });

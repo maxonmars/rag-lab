@@ -56,6 +56,14 @@ describe("CLI и REPL", () => {
       timeoutMs: 180000,
       maxOutputTokens: 1024,
     });
+    expect(result.output).toContain("── Ответ агента · local · qwen3 ──");
+  });
+
+  it("--llm-local-model меняет подпись модели в ответе", async () => {
+    const argv = ["--llm-provider", "local", "--llm-local-model", "qwen3.8:27b-mlx", "ask", "Тест"];
+    const result = await invoke(argv, { cwd, authenticated: false });
+    expect(result.code).toBe(0);
+    expect(result.output).toContain("── Ответ агента · local · qwen3.8:27b-mlx ──");
   });
 
   it("LAB_LLM_PROVIDER=deepseek передаёт ключ и модель DeepSeek", async () => {
@@ -63,13 +71,14 @@ describe("CLI и REPL", () => {
     expect(result.createModel).toHaveBeenCalledWith(
       expect.objectContaining({ provider: "deepseek", apiKey: "test-key", model: "deepseek-flash" }),
     );
+    expect(result.output).toContain("── Ответ агента · deepseek · deepseek-flash ──");
   });
 
   it("продолжает REPL после неизвестной команды и останавливается на /exit", async () => {
     const result = await invoke([], { cwd, input: "/unknown\nВопрос\n/exit\nПосле выхода\n" });
     expect(result.code).toBe(1);
     expect(result.error).toContain("Неизвестная команда");
-    expect(result.output).toBe("\n── Ответ агента ──\n\nОтвет: Вопрос\n");
+    expect(result.output).toBe("\n── Ответ агента · deepseek · deepseek-flash ──\n\nОтвет: Вопрос\n");
     expect(result.complete).toHaveBeenCalledTimes(1);
   });
 
@@ -82,6 +91,7 @@ describe("CLI и REPL", () => {
   it("интерактивный REPL показывает заголовок один раз и приглашение перед каждым вводом", async () => {
     const result = await invoke([], { cwd, input: "Вопрос\n/exit\n", interactive: true });
     expect(result.output.match(/── rag-lab ──/g)).toHaveLength(1);
+    expect(result.output.match(/Модель: deepseek · deepseek-flash/g)).toHaveLength(1);
     expect(result.output).toContain(
       "/ask · /help · /config show · /rag index · /rag compare · /rag calibrate · /rag ask · /rag on · /rag off · /rag eval · /rag citations · /rag dialog · /rag state · /rag reset · /exit",
     );

@@ -26,7 +26,7 @@ Qwen3 не расходовали `llm.maxOutputTokens`. Ядро, порты и
 
 Настройки: `llm.provider` (`deepseek` по умолчанию, `local`), `llm.localBaseUrl`, `llm.localModel`, `llm.localTimeoutMs`.
 `llm.maxOutputTokens` общий. Ключ `LAB_LLM_API_KEY` нужен только DeepSeek. Подпись `провайдер · модель` попадает в метаданные
-отчётов `rag eval`, `rag citations`, `rag dialog`, чтобы отчёты разных провайдеров различались.
+отчётов `rag eval`, `rag citations`, `rag dialog`, а также в баннер REPL и заголовки ответов CLI.
 
 ## Последствия
 
@@ -39,4 +39,4 @@ Qwen3 не расходовали `llm.maxOutputTokens`. Ядро, порты и
 ## Проверка
 
 Тесты `adapters/llm/tests/local.test.ts` (адрес, тело запроса, ошибка соединения) и `app/tests/cli.test.ts` (выбор провайдера,
-работа без ключа). Ручное демо — `docs/demos/local-llm.md`.
+работа без ключа, подпись модели в ответе). Ручное демо — `docs/demos/local-llm.md`.
