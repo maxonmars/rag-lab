@@ -19,6 +19,7 @@ export async function runCli(
   argv: readonly string[],
   terminal: Terminal,
   view: CliView,
+  model: string,
 ): Promise<number> {
   if (argv.length > 0) {
     try {
@@ -33,7 +34,7 @@ export async function runCli(
   let exitCode = 0;
   try {
     if (terminal.interactive) {
-      view.banner(commands);
+      view.banner(commands, model);
       view.prompt();
     }
     for await (const line of lines) {

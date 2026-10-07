@@ -24,19 +24,21 @@ function capture(color = false) {
   return stream;
 }
 
+const model = "local · qwen3";
+
 const commands: Command[] = [
   { name: "ask", arguments: ["<текст...>"], description: "Спросить.", run: async () => "continue" },
   { name: "help", arguments: [], aliases: ["--help", "-h"], description: "Справка.", run: async () => "continue" },
 ];
 
 function renderAll(view: CliView): void {
-  view.banner(commands);
+  view.banner(commands, model);
   view.prompt();
-  view.answer("Ответ модели");
+  view.answer("Ответ модели", model);
   view.help(commands, [{ flag: "--llm-model", type: "string", description: "Модель." }]);
   view.config([{ key: "llm.apiKey", value: "[задано]", source: "env" }]);
   view.indexBuilt(["fixed: 2 чанка"], "/data/index.json");
-  view.ragAnswer("Ответ по документам", ["1. a.md › Раздел · 0.71"]);
+  view.ragAnswer("Ответ по документам", ["1. a.md › Раздел · 0.71"], model);
   view.ragMode(["Ответы без RAG."]);
   view.error(new AgentError("EMPTY_RESPONSE"));
 }
@@ -48,7 +50,7 @@ it("обычный поток получает текст без ANSI, цвет�
   renderAll(new CliView(colored.output, colored.error));
   expect(plain.output.text).not.toContain("\u001b[");
   expect(plain.error.text).toBe("Ошибка · Модель вернула пустой ответ.\n");
-  expect(colored.output.text).toContain("\u001b[36m\u001b[1m── Ответ агента ──");
+  expect(colored.output.text).toContain("\u001b[36m\u001b[1m── Ответ агента · local · qwen3 ──");
   expect(colored.output.text).toContain("\u001b[35mrag-lab >\u001b[39m ");
   expect(colored.error.text).toContain("\u001b[31m\u001b[1mОшибка");
   expect(stripVTControlCharacters(colored.output.text)).toBe(plain.output.text);
@@ -59,7 +61,7 @@ it("решает о цвете отдельно для stdout и stderr", () => 
   const output = capture(true);
   const error = capture();
   const view = new CliView(output, error);
-  view.answer("Текст");
+  view.answer("Текст", model);
   view.error(new AgentError("EMPTY_INPUT"));
   expect(output.text).toContain("\u001b[");
   expect(error.text).toBe("Ошибка · Введите непустую реплику.\n");
@@ -72,10 +74,11 @@ it("оформляет справку, настройки и ответ по в�
   expect(output.text).toBe(
     [
       "── rag-lab ──",
+      "Модель: local · qwen3",
       "Команды: /ask · /help. Строка без / — вопрос агенту.",
       "",
       "rag-lab > ",
-      "── Ответ агента ──",
+      "── Ответ агента · local · qwen3 ──",
       "",
       "Ответ модели",
       "",
@@ -99,7 +102,7 @@ it("оформляет справку, настройки и ответ по в�
       "",
       "Сохранено: /data/index.json",
       "",
-      "── Ответ агента · RAG ──",
+      "── Ответ агента · RAG · local · qwen3 ──",
       "",
       "Ответ по документам",
       "",
@@ -134,11 +137,11 @@ it("сравнение и ход операции: итог — в stdout, хо�
 it("ответ с RAG без фрагментов, итог калибровки и итог rag eval", () => {
   const output = capture();
   const view = new CliView(output, capture());
-  view.ragAnswer("Ответ", []);
+  view.ragAnswer("Ответ", [], model);
   view.calibrationSaved(["Рекомендуемый порог: 0.55"], "/data/rag-calibration.md");
   view.evalSaved(["Вопросов: 10"], "/data/rag-eval.md");
   expect(output.text).toBe(
-    "\n── Ответ агента · RAG ──\n\nОтвет\n\nФрагменты: контекст пуст\n" +
+    "\n── Ответ агента · RAG · local · qwen3 ──\n\nОтвет\n\nФрагменты: контекст пуст\n" +
       "\n── Калибровка порога ──\n\nРекомендуемый порог: 0.55\n\nСохранено: /data/rag-calibration.md\n" +
       "\n── Контрольные вопросы ──\n\nВопросов: 10\n\nСохранено: /data/rag-eval.md\n",
   );

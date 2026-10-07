@@ -37,24 +37,30 @@ export class CliView {
     this.#paint = painter(output);
   }
 
-  answer(text: string): void {
-    this.#block("Ответ агента", [text]);
+  answer(text: string, model: string): void {
+    this.#block(`Ответ агента · ${model}`, [text]);
   }
 
-  /** Ответ с RAG: текст модели и под ним фрагменты, переданные модели; пустой список — контекст без фрагментов. */
-  ragAnswer(text: string, fragments: readonly string[]): void {
-    this.#ragBlock("Ответ агента · RAG", text, fragments, []);
+  /** Ответ с RAG: текст модели и под ним фрагменты, переданные модели; пустой список — контекст без фрагментов. `model` — подпись `провайдер · модель` для заголовка. */
+  ragAnswer(text: string, fragments: readonly string[], model: string): void {
+    this.#ragBlock(`Ответ агента · RAG · ${model}`, text, fragments, []);
   }
 
   /** Ответ RAG-чата: как `ragAnswer`, плюс цель и пункты, добавленные в память задачи этим ходом; пустая цель — «не зафиксирована». */
-  chatAnswer(text: string, fragments: readonly string[], goal: string, remembered: readonly string[]): void {
+  chatAnswer(
+    text: string,
+    fragments: readonly string[],
+    goal: string,
+    remembered: readonly string[],
+    model: string,
+  ): void {
     const footer = [`${this.#paint("key", "Цель:")} ${goal === "" ? "не зафиксирована" : goal}`];
     const label = this.#paint("key", "Память:");
     footer.push(
       remembered.length > 0 ? `${label} добавлено` : `${label} без изменений`,
       ...remembered.map((line) => `  + ${line}`),
     );
-    this.#ragBlock("Ответ агента · RAG-чат", text, fragments, footer);
+    this.#ragBlock(`Ответ агента · RAG-чат · ${model}`, text, fragments, footer);
   }
 
   taskState(lines: readonly string[]): void {
@@ -134,9 +140,10 @@ export class CliView {
     this.#error.write(`${paint("errorLabel", "Ошибка")}${paint("error", ` · ${describeError(error)}`)}\n`);
   }
 
-  banner(commands: readonly Command[]): void {
+  banner(commands: readonly Command[], model: string): void {
     const hint = `Команды: ${commands.map((command) => `/${command.name}`).join(" · ")}. Строка без / — вопрос агенту.`;
-    this.#output.write(`${this.#paint("heading", "── rag-lab ──")}\n${this.#paint("muted", hint)}\n`);
+    const heading = this.#paint("heading", "── rag-lab ──");
+    this.#output.write(`${heading}\n${this.#paint("muted", `Модель: ${model}`)}\n${this.#paint("muted", hint)}\n`);
   }
 
   prompt(): void {

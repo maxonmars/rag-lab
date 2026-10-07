@@ -5,7 +5,7 @@ import { createAskHandler } from "./ask.ts";
 import { createCommands } from "./commands.ts";
 import { parseOptions, type ResolvedConfig, resolveConfig, showConfig } from "./config.ts";
 import type { CreateEmbeddings } from "./embeddings.ts";
-import type { CreateModel, ModelOptions } from "./model.ts";
+import { type CreateModel, type ModelOptions, modelLabel } from "./model.ts";
 import { createRagHandlers } from "./rag.ts";
 import { createRagAnswerHandlers, modeLines } from "./ragAnswer.ts";
 import { createRagChatHandlers, stateLines } from "./ragChat.ts";
@@ -36,6 +36,7 @@ export async function run(options: RunOptions): Promise<number> {
   let dialog: Dialog = EMPTY_DIALOG;
   const commands = createCommands({
     ask: createAskHandler({ createModel, getConfig }),
+    modelLabel: () => modelLabel(config),
     config: () => showConfig(config),
     ragIndex: rag.index,
     ragCompare: rag.compare,
@@ -73,5 +74,5 @@ export async function run(options: RunOptions): Promise<number> {
     view.error(error);
     return 1;
   }
-  return runCli(commands, command, options.terminal, view);
+  return runCli(commands, command, options.terminal, view, modelLabel(config));
 }

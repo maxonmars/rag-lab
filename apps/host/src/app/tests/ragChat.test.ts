@@ -96,7 +96,7 @@ describe("REPL: чат с RAG", () => {
       "## Ответ\n\nДокумент повторяет слово [1].\n\n## Источники\n\n- [1] `a.md` › Один\n\n## Цитаты\n\n- [1] «слово слово слово слово слово»",
     );
     expect(String(second?.messages[3]?.content)).toContain("## Память задачи");
-    expect(result.output.match(/── Ответ агента · RAG-чат ──/g)).toHaveLength(2);
+    expect(result.output.match(/── Ответ агента · RAG-чат · deepseek · deepseek-flash ──/g)).toHaveLength(2);
     expect(result.output).toContain("Источники:");
     expect(result.output).toContain("Цель: изучить слово");
     expect(result.output).toContain(
@@ -121,7 +121,7 @@ describe("REPL: чат с RAG", () => {
     const asked = answerRequests(complete)[1];
     expect(asked?.messages).toHaveLength(2);
     expect(String(asked?.messages[1]?.content)).not.toContain("Память задачи");
-    expect(result.output).toContain("── Ответ агента · RAG ──");
+    expect(result.output).toContain("── Ответ агента · RAG · deepseek · deepseek-flash ──");
     expect(result.output).toContain("Ходов: 1");
   });
 

@@ -21,6 +21,7 @@ const silentView = {
 function stubRegistry() {
   return createCommands({
     ask: async () => "",
+    modelLabel: () => "",
     config: () => [],
     ragIndex: async () => ({ lines: [], path: "" }),
     ragCompare: async () => ({ lines: [], path: "" }),
