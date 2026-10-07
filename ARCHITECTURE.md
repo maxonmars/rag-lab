@@ -3,7 +3,7 @@
 ## Текущее приложение
 
 Исполняемый workspace `apps/host`. Общих библиотек и серверов нет. `app/main.ts` принимает окружение, argv и потоки;
-`app/compose.ts` собирает приложение. Модель DeepSeek создаётся лениво при первом `ask`, `rag ask`, `rag eval`, `rag citations` или `rag dialog`, поэтому
+`app/compose.ts` собирает приложение. Модель (DeepSeek или локальная по `llm.provider`) создаётся лениво при первом `ask`, `rag ask`, `rag eval`, `rag citations` или `rag dialog`, поэтому
 справка, настройки, `rag index`, `rag compare` и `rag calibrate` работают без ключа.
 
 ```mermaid
@@ -15,6 +15,7 @@ flowchart LR
     CLI --> Core
     LLM --> Core
     LLM --> DeepSeek[DeepSeek API]
+    LLM --> Local[Локальный сервер /v1]
     Rag --> Core
     Rag --> Ollama[Ollama /api/embed]
     Rag --> Corpus[(.local/rag/corpus)]
@@ -27,7 +28,7 @@ flowchart LR
 
 Agent инкапсулирует ModelPort и текст системной инструкции и не хранит состояния: историю диалога передаёт вызывающий через
 `respond(input, { history })`, а сообщения собираются как system → история → вопрос.
-DeepSeekModel переводит формат SDK и ошибки в AgentError, SDK-повторы отключены. В ядре нет SDK, файлов, env,
+ChatCompletionsModel (DeepSeekModel и LocalModel отличаются адресом и полями тела запроса) переводит формат SDK и ошибки в AgentError, SDK-повторы отключены. В ядре нет SDK, файлов, env,
 CLI-команд и пользовательских подсказок. `ask` по умолчанию отправляет реплику модели без поиска по документам;
 после `/rag on` тот же ввод отвечает с RAG (раздел ниже).
 

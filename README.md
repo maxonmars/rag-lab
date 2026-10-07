@@ -28,7 +28,7 @@ npm run dev -- rag compare
 `corpus:feod` клонирует feod-docs в `.local/rag/source`, переключает на закреплённый коммит и собирает 32 документа в
 `.local/rag/corpus`. Ollama должна быть запущена (`ollama serve`); `rag index` печатает ход по стратегиям в stderr.
 Результаты — `.local/rag/index.json` и `.local/rag/comparison.md` (каталог `.local/` не попадает в git).
-Ключ DeepSeek нужен для `ask`, `rag ask`, `rag eval`, `rag citations` и `rag dialog`: `LAB_LLM_API_KEY` в корневом `.env` или окружении процесса.
+Ключ DeepSeek нужен для `ask`, `rag ask`, `rag eval`, `rag citations` и `rag dialog` при `llm.provider: deepseek`: `LAB_LLM_API_KEY` в корневом `.env` или окружении процесса. С `--llm-provider local` те же команды идут в локальный сервер без ключа ([демо](docs/demos/local-llm.md)).
 `rag calibrate` ключа не требует.
 
 ```sh

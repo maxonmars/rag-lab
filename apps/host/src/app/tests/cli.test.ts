@@ -46,6 +46,25 @@ describe("CLI и REPL", () => {
     expect(result.createModel).not.toHaveBeenCalled();
   });
 
+  it("--llm-provider local создаёт локальную модель без ключа", async () => {
+    const result = await invoke(["--llm-provider", "local", "ask", "Тест"], { cwd, authenticated: false });
+    expect(result.code).toBe(0);
+    expect(result.createModel).toHaveBeenCalledWith({
+      provider: "local",
+      baseUrl: "http://localhost:11434/v1",
+      model: "qwen3",
+      timeoutMs: 180000,
+      maxOutputTokens: 1024,
+    });
+  });
+
+  it("LAB_LLM_PROVIDER=deepseek передаёт ключ и модель DeepSeek", async () => {
+    const result = await invoke(["ask", "Тест"], { cwd, env: { LAB_LLM_PROVIDER: "deepseek" } });
+    expect(result.createModel).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: "deepseek", apiKey: "test-key", model: "deepseek-flash" }),
+    );
+  });
+
   it("продолжает REPL после неизвестной команды и останавливается на /exit", async () => {
     const result = await invoke([], { cwd, input: "/unknown\nВопрос\n/exit\nПосле выхода\n" });
     expect(result.code).toBe(1);

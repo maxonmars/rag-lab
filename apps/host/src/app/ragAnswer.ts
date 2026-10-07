@@ -16,7 +16,7 @@ import {
 import { systemPrompt } from "./ask.ts";
 import type { ResolvedConfig } from "./config.ts";
 import { type CreateEmbeddings, configuredEmbeddings, ragPaths } from "./embeddings.ts";
-import { type CreateModel, createConfiguredModel } from "./model.ts";
+import { type CreateModel, createConfiguredModel, modelLabel } from "./model.ts";
 import type { RagOutcome } from "./rag.ts";
 import { retrievalSettings } from "./retrieval.ts";
 
@@ -90,7 +90,7 @@ export async function prepareRag(options: RagAnswerHandlerOptions) {
   const model = createConfiguredModel(config, options.createModel);
   const embeddings = configuredEmbeddings(config, options.createEmbeddings);
   const index = await openIndex({ indexFile: paths.indexFile, embeddings });
-  return { values: config.values, paths, model, index, retrieval };
+  return { values: config.values, paths, model, modelName: modelLabel(config), index, retrieval };
 }
 
 export function createRagAnswerHandlers(options: RagAnswerHandlerOptions) {
@@ -112,7 +112,7 @@ export function createRagAnswerHandlers(options: RagAnswerHandlerOptions) {
     },
 
     async evaluate(): Promise<RagOutcome> {
-      const { values, paths, model, index, retrieval } = await prepare();
+      const { values, paths, model, modelName, index, retrieval } = await prepare();
       const result = await evaluateQuestions({
         questionsFile: paths.questionsFile,
         reportFile: paths.evalFile,
@@ -120,14 +120,14 @@ export function createRagAnswerHandlers(options: RagAnswerHandlerOptions) {
         model,
         systemPrompt: systemPrompt(),
         ...retrieval,
-        meta: { questionsFile: values["rag.questionsFile"], llmModel: values["llm.model"] },
+        meta: { questionsFile: values["rag.questionsFile"], llmModel: modelName },
         onProgress: (event) => options.view.progress(`${event.id}: ${STEP_LABELS[event.step]}`),
       });
       return { lines: evalLines(result, retrieval.topK), path: result.path };
     },
 
     async citations(): Promise<RagOutcome> {
-      const { values, paths, model, index, retrieval } = await prepare();
+      const { values, paths, model, modelName, index, retrieval } = await prepare();
       const mode = values["rag.retrievalMode"];
       const result = await evaluateCitations({
         questionsFile: paths.questionsFile,
@@ -137,7 +137,7 @@ export function createRagAnswerHandlers(options: RagAnswerHandlerOptions) {
         systemPrompt: systemPrompt(),
         mode,
         ...retrieval,
-        meta: { questionsFile: values["rag.questionsFile"], llmModel: values["llm.model"] },
+        meta: { questionsFile: values["rag.questionsFile"], llmModel: modelName },
         onProgress: (event) => options.view.progress(`${event.id}: ответ с источниками`),
       });
       return { lines: citationLines(result, mode), path: result.path };
