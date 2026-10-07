@@ -3,13 +3,18 @@ import { MAX_HISTORY_TURNS, MAX_TOP_K, RETRIEVAL_MODES, SIMILARITY_RANGE, STRATE
 import { sections } from "./markdown.ts";
 
 const descriptions = sections(new URL("./settings.md", import.meta.url));
+export const LLM_PROVIDERS = ["deepseek", "local"] as const;
 const positiveInteger = z.number().int().positive().max(Number.MAX_SAFE_INTEGER);
 
 export const settings = {
   "config.file": { schema: z.string().trim().min(1), default: "lab.config.yaml", type: "string", file: false },
+  "llm.provider": { schema: z.enum(LLM_PROVIDERS), default: "deepseek", type: "string" },
   "llm.model": { schema: z.string().trim().min(1), default: "deepseek-flash", type: "string" },
   "llm.timeoutMs": { schema: positiveInteger, default: 30000, type: "number" },
   "llm.maxOutputTokens": { schema: positiveInteger, default: 1024, type: "number" },
+  "llm.localBaseUrl": { schema: z.url(), default: "http://localhost:11434/v1", type: "string" },
+  "llm.localModel": { schema: z.string().trim().min(1), default: "qwen3", type: "string" },
+  "llm.localTimeoutMs": { schema: positiveInteger, default: 180000, type: "number" },
   "llm.apiKey": { schema: z.string().trim().min(1).nullable(), default: null, type: "string", secret: true },
   "rag.inputDir": { schema: z.string().trim().min(1), default: ".local/rag/corpus", type: "string" },
   "rag.outputDir": { schema: z.string().trim().min(1), default: ".local/rag", type: "string" },

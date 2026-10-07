@@ -71,7 +71,7 @@ export function createRagChatHandlers(options: RagAnswerHandlerOptions) {
     },
 
     async dialogs(): Promise<RagOutcome> {
-      const { values, paths, model, index, retrieval } = await prepareRag(options);
+      const { values, paths, model, modelName, index, retrieval } = await prepareRag(options);
       const mode = values["rag.retrievalMode"];
       const historyTurns = values["rag.historyTurns"];
       const result = await evaluateDialogs({
@@ -83,7 +83,7 @@ export function createRagChatHandlers(options: RagAnswerHandlerOptions) {
         mode,
         historyTurns,
         ...retrieval,
-        meta: { scenariosFile: values["rag.dialogFile"], llmModel: values["llm.model"] },
+        meta: { scenariosFile: values["rag.dialogFile"], llmModel: modelName },
         onProgress: (event) => options.view.progress(`${event.id}: ход ${event.turn}`),
       });
       return { lines: dialogLines(result, mode, historyTurns), path: result.path };

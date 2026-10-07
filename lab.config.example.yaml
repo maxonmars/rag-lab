@@ -1,6 +1,10 @@
+llm.provider: deepseek
 llm.model: deepseek-flash
 llm.timeoutMs: 30000
 llm.maxOutputTokens: 1024
+llm.localBaseUrl: http://localhost:11434/v1
+llm.localModel: qwen3
+llm.localTimeoutMs: 180000
 rag.inputDir: .local/rag/corpus
 rag.outputDir: .local/rag
 rag.chunkSizeChars: 1800

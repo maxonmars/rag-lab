@@ -12,7 +12,7 @@
 ## Навигация
 
 - `src/core` — Agent, ModelPort, ToolSource, AgentError, собственные тесты.
-- `src/adapters/llm` — DeepSeek SDK, перевод ошибок, тесты с подменённым fetch.
+- `src/adapters/llm` — OpenAI-совместимый клиент с провайдерами DeepSeek и локальным сервером, перевод ошибок, тесты с подменённым fetch.
 - `src/adapters/cli` — dispatch, чтение строк и CliView: оформление вывода и ошибок через styleText.
 - `src/app` — запуск, composition root и режим сессии, реестры настроек и команд, системная инструкция, обработчики `ask`, `rag` (`index`, `compare`, `calibrate`), `rag ask`/`rag eval`/`rag citations` и чат (`rag dialog`, диалог REPL).
 - `src/features/rag` — индексация документов (корпус, чанкинг, эмбеддинги Ollama, `index.json`, сравнение стратегий), поиск по индексу, rewrite запроса, отбор по порогу, ответ с RAG, источники, проверка цитат и режим «не знаю», калибровка порога, контрольные вопросы и отчёты `rag eval` и `rag citations`, чат с историей и памятью задачи (`chat/`) и отчёт `rag dialog`.

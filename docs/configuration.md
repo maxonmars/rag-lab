@@ -9,9 +9,13 @@ YAML содержит плоские ключи с точками. Секрет�
 | Ключ | Тип | Default | Env | Флаг | Описание |
 |---|---|---|---|---|---|
 | config.file | string | lab.config.yaml | LAB_CONFIG_FILE | --config-file | Путь к YAML-конфигурации относительно текущего рабочего каталога. |
-| llm.model | string | deepseek-flash | LAB_LLM_MODEL | --llm-model | Идентификатор модели DeepSeek. |
+| llm.provider | string | deepseek | LAB_LLM_PROVIDER | --llm-provider | Провайдер модели ответов, rewrite и памяти задачи: `deepseek` — облачный API, `local` — локальный OpenAI-совместимый сервер (Ollama, LM Studio, `mlx_lm.server`). Эмбеддинги от провайдера не зависят и всегда идут в Ollama. |
+| llm.model | string | deepseek-flash | LAB_LLM_MODEL | --llm-model | Идентификатор модели DeepSeek; используется при `llm.provider: deepseek`. |
 | llm.timeoutMs | number | 30000 | LAB_LLM_TIMEOUT_MS | --llm-timeout-ms | Таймаут одного запроса к модели, миллисекунды. |
-| llm.maxOutputTokens | number | 1024 | LAB_LLM_MAX_OUTPUT_TOKENS | --llm-max-output-tokens | Максимальное число токенов ответа. |
+| llm.maxOutputTokens | number | 1024 | LAB_LLM_MAX_OUTPUT_TOKENS | --llm-max-output-tokens | Максимальное число токенов ответа; общий для обоих провайдеров. |
+| llm.localBaseUrl | string | http://localhost:11434/v1 | LAB_LLM_LOCAL_BASE_URL | --llm-local-base-url | Адрес OpenAI-совместимого API локального сервера, вместе с `/v1`; используется при `llm.provider: local`. Ollama — `http://localhost:11434/v1`, LM Studio — `http://localhost:1234/v1`. |
+| llm.localModel | string | qwen3 | LAB_LLM_LOCAL_MODEL | --llm-local-model | Имя локальной модели на сервере, например из `ollama list`. |
+| llm.localTimeoutMs | number | 180000 | LAB_LLM_LOCAL_TIMEOUT_MS | --llm-local-timeout-ms | Таймаут одного запроса к локальной модели, миллисекунды; локальный вывод заметно медленнее облачного. |
 | llm.apiKey | string | — | LAB_LLM_API_KEY | — | Ключ DeepSeek; принимается только из env, значение никогда не выводится. |
 | rag.inputDir | string | .local/rag/corpus | LAB_RAG_INPUT_DIR | --rag-input-dir | Каталог Markdown-корпуса относительно текущего рабочего каталога; готовится командой `npm run corpus:feod`. |
 | rag.outputDir | string | .local/rag | LAB_RAG_OUTPUT_DIR | --rag-output-dir | Каталог результатов относительно текущего рабочего каталога: `index.json`, `comparison.md`, `rag-calibration.md` и `rag-eval.md`. |
