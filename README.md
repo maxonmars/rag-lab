@@ -67,6 +67,7 @@ npm run dev
 
 Настройки — YAML-файл, env (`LAB_RAG_…`) и флаги; приоритет и список — [docs/configuration.md](docs/configuration.md),
 команды — [docs/commands.md](docs/commands.md). Пример файла — [lab.config.example.yaml](lab.config.example.yaml).
+`npm run dev:local` запускает приложение с профилем [lab.local.yaml](lab.local.yaml) на локальной модели — [демо](docs/demos/local-llm.md).
 
 ## Материалы
 

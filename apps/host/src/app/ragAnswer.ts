@@ -73,11 +73,18 @@ function evalLines(result: EvalResult, topK: number): string[] {
 
 function citationLines(result: CitationEvalResult, mode: RetrievalMode): string[] {
   const { metrics: m } = result;
+  const g = m.timing.generation;
+  const generation =
+    g === null
+      ? "Генерация: модель не вызывалась"
+      : `Генерация: медиана ${(g.medianMs / 1000).toFixed(1)} с, максимум ${(g.maxMs / 1000).toFixed(1)} с (вопросов ${g.count})`;
   return [
     `Вопросов: ${result.questions}, режим ${mode}`,
     `Положительные: с источниками ${share(m.withSources, m.positives)}, с цитатами ${share(m.withQuotes, m.positives)}, ожидаемый файл среди источников ${share(m.expectedCited, m.positives)}, «не знаю» ${share(m.positiveUnknown, m.positives)}`,
     `Отрицательные: «не знаю» ${share(m.unknownByRetrieval + m.unknownByModel, m.negatives)} (пустой контекст ${m.unknownByRetrieval}, моделью ${m.unknownByModel})`,
     `Цитаты дословно: ${share(m.verifiedQuotes, m.quotes)}; ответов без замечаний: ${share(m.clean, m.questions)}`,
+    `Ошибки модели: ${share(m.failed, m.questions)}`,
+    generation,
     `Длительность прогона: ${(result.wallMs / 1000).toFixed(1)} с`,
   ];
 }
@@ -138,7 +145,10 @@ export function createRagAnswerHandlers(options: RagAnswerHandlerOptions) {
         mode,
         ...retrieval,
         meta: { questionsFile: values["rag.questionsFile"], llmModel: modelName },
-        onProgress: (event) => options.view.progress(`${event.id}: ответ с источниками`),
+        onProgress: (event) =>
+          options.view.progress(
+            event.failed ? `${event.id}: ошибка модели ${event.failed}` : `${event.id}: ответ с источниками`,
+          ),
       });
       return { lines: citationLines(result, mode), path: result.path };
     },

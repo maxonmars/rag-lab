@@ -40,7 +40,7 @@
 Прогнать сценарии rag.dialogFile (каждый в новом пустом диалоге) в режиме rag.retrievalMode и окне rag.historyTurns и записать отчёт rag-dialog.md: источники и цитаты по ходам, сохранение цели и ключей памяти. Нужны индекс, запущенная Ollama и LAB_LLM_API_KEY; первая ошибка прерывает прогон, прежний отчёт остаётся.
 
 ## rag citations
-Прогнать контрольные вопросы rag.questionsFile в режиме rag.retrievalMode и записать отчёт rag-citations.md: источники (chunk_id, source), проверка цитат на дословность, ответы «не знаю». Нужны индекс, запущенная Ollama и LAB_LLM_API_KEY.
+Прогнать контрольные вопросы rag.questionsFile в режиме rag.retrievalMode и записать отчёт rag-citations.md: источники (chunk_id, source), проверка цитат на дословность, ответы «не знаю». Нужны индекс и запущенная Ollama; LAB_LLM_API_KEY — только при llm.provider: deepseek. Ошибка модели записывается как исход вопроса и не прерывает прогон.
 
 ## exit
 Завершить ввод реплик.
