@@ -1,5 +1,5 @@
 import { AgentError, type AgentErrorCode, type ModelPort } from "../../core/index.ts";
-import { answerWithRag } from "./answer.ts";
+import { type AnswerPrompt, answerWithRag } from "./answer.ts";
 import { writeFileAtomic } from "./atomicWrite.ts";
 import { type CitationMetrics, type CitationResult, citationMetrics } from "./citationMetrics.ts";
 import { renderCitationReport } from "./citationReport.ts";
@@ -19,6 +19,7 @@ export type CitationEvalOptions = RetrievalParams &
     mode: RetrievalMode;
     model: ModelPort;
     systemPrompt: string;
+    answerPrompt: AnswerPrompt;
     /** Значения только для шапки отчёта. */
     meta: Readonly<{ questionsFile: string; llmModel: string }>;
     onProgress?: (event: CitationProgress) => void;
@@ -46,6 +47,7 @@ async function answerQuestion(question: ControlQuestion, options: CitationEvalOp
       threshold: options.threshold,
       model: options.model,
       systemPrompt: options.systemPrompt,
+      answerPrompt: options.answerPrompt,
     });
     return { question, result };
   } catch (error) {
@@ -79,6 +81,7 @@ export async function evaluateCitations(options: CitationEvalOptions): Promise<C
       params: options,
       questionsFile: options.meta.questionsFile,
       llmModel: options.meta.llmModel,
+      answerPrompt: options.answerPrompt,
       wallMs,
       results,
       metrics,

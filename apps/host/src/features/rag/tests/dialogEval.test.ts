@@ -50,6 +50,7 @@ function setup(overrides: Partial<DialogEvalOptions> = {}, modelOptions: FakeCha
     threshold: 0.6,
     model: turn.model,
     systemPrompt: "Системная инструкция.",
+    answerPrompt: "default",
     historyTurns: 6,
     meta: { scenariosFile: "experiments/feod-chat/scenarios.md", llmModel: "deepseek-flash" },
     now: () => new Date("2026-10-02T12:00:00Z"),
@@ -116,6 +117,7 @@ describe("evaluateDialogs: отчёт", () => {
     expect(text).toContain(
       "стратегия structure, режим rewrite-filter, кандидатов 4, итоговый top-3, порог 0.6 (применяется)",
     );
+    expect(text).toContain("Шаблон ответа: `default` (prompts/answer.md).");
     expect(text).toContain("Окно истории: 6 ходов.");
   });
 

@@ -1,3 +1,4 @@
+import { ANSWER_PROMPT_FILES, type AnswerPrompt } from "../answer.ts";
 import { outOf, seconds } from "../format.ts";
 import { type RetrievalMode, type RetrievalParams, usesFilter } from "../retrieval.ts";
 import type { SearchIndex } from "../search.ts";
@@ -14,6 +15,7 @@ export type DialogReportData = Readonly<{
   historyTurns: number;
   scenariosFile: string;
   llmModel: string;
+  answerPrompt: AnswerPrompt;
   wallMs: number;
   runs: readonly ScenarioRun[];
   metrics: readonly ScenarioMetrics[];
@@ -28,7 +30,7 @@ function header(data: DialogReportData): string[] {
     "",
     `Прогон ${data.now.toISOString()}. Сценарии: \`${data.scenariosFile}\` (${data.runs.length}, реплик ${turns}). Фактическая длительность прогона: ${seconds(data.wallMs)} с.`,
     `Индекс создан ${index.createdAt}, модель эмбеддингов \`${index.model.name}\` (digest ${index.model.digest.slice(0, 12)}).`,
-    `Модель ответов, памяти задачи и переписывания запроса: \`${data.llmModel}\`. Поиск: стратегия ${data.strategy}, режим ${mode}, кандидатов ${params.candidateTopK}, итоговый top-${params.topK}, порог ${params.threshold} (${threshold}). Окно истории: ${data.historyTurns} ходов.`,
+    `Модель ответов, памяти задачи и переписывания запроса: \`${data.llmModel}\`. Шаблон ответа: \`${data.answerPrompt}\` (prompts/${ANSWER_PROMPT_FILES[data.answerPrompt]}). Поиск: стратегия ${data.strategy}, режим ${mode}, кандидатов ${params.candidateTopK}, итоговый top-${params.topK}, порог ${params.threshold} (${threshold}). Окно истории: ${data.historyTurns} ходов.`,
     "",
   ];
 }

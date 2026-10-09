@@ -121,6 +121,7 @@ describe("renderCitationReport: время и ошибки", () => {
       params: { candidateTopK: 4, topK: 3, threshold: 0.65 },
       questionsFile: "questions.md",
       llmModel: "model",
+      answerPrompt: "default",
       wallMs: 1000,
       results,
       metrics: citationMetrics(results),

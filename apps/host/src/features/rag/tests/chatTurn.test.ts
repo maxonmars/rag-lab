@@ -17,6 +17,15 @@ describe("chatTurn: порядок шагов", () => {
     expect(dialog).toEqual({ state: STATE, turns: [turn] });
   });
 
+  it("compact: системное сообщение ответа — system, answer-compact.md и chat.md", async () => {
+    const { options, ofKind } = chatSetup({ answerPrompt: "compact" });
+    await chatTurn(options);
+    expect(ofKind("answer")[0]?.messages[0]).toEqual({
+      role: "system",
+      content: `Системная инструкция.\n\n${readPrompt("answer-compact.md")}\n\n${readPrompt("chat.md")}`,
+    });
+  });
+
   it("baseline: память → ответ, поиск по исходному вопросу", async () => {
     const { options, search, kinds } = chatSetup({ mode: "baseline" });
     const { turn } = await chatTurn(options);

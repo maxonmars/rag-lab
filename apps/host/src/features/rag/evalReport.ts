@@ -1,3 +1,4 @@
+import { ANSWER_PROMPT_FILES, type AnswerPrompt } from "./answer.ts";
 import type { ModeMetrics, QuestionResult } from "./evalMetrics.ts";
 import { questionSection } from "./evalSections.ts";
 import { filesList, integer, seconds } from "./format.ts";
@@ -13,6 +14,7 @@ export type EvalReportData = Readonly<{
   params: RetrievalParams;
   questionsFile: string;
   llmModel: string;
+  answerPrompt: AnswerPrompt;
   wallMs: number;
   results: readonly QuestionResult[];
   metrics: Readonly<Record<RetrievalMode, ModeMetrics>>;
@@ -29,7 +31,7 @@ function header(data: EvalReportData): string[] {
     "",
     `Прогон ${data.now.toISOString()}. Вопросы: \`${data.questionsFile}\` (${data.results.length}). Фактическая длительность прогона: ${seconds(data.wallMs)} с.`,
     `Индекс создан ${index.createdAt}, модель эмбеддингов \`${index.model.name}\` (digest ${index.model.digest.slice(0, 12)}).`,
-    `Модель ответов и переписывания запроса: \`${data.llmModel}\`. Поиск: стратегия ${data.strategy}, косинусная близость, линейный перебор; кандидатов ${params.candidateTopK}, итоговый top-${params.topK}, порог ${params.threshold} (используется в filter и rewrite-filter).`,
+    `Модель ответов и переписывания запроса: \`${data.llmModel}\`. Шаблон ответа: \`${data.answerPrompt}\` (prompts/${ANSWER_PROMPT_FILES[data.answerPrompt]}). Поиск: стратегия ${data.strategy}, косинусная близость, линейный перебор; кандидатов ${params.candidateTopK}, итоговый top-${params.topK}, порог ${params.threshold} (используется в filter и rewrite-filter).`,
     "",
   ];
 }

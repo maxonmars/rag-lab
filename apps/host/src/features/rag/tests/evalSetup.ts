@@ -57,6 +57,7 @@ export function setupEval(root: string, overrides: Partial<EvalOptions> = {}, mo
     threshold: 0.65,
     model: fake.model,
     systemPrompt: "Системная инструкция.",
+    answerPrompt: "default",
     meta: { questionsFile: "experiments/feod-retrieval/questions.md", llmModel: "deepseek-flash" },
     now: () => new Date("2026-09-29T12:00:00Z"),
     ...overrides,

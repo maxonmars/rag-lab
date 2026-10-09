@@ -60,6 +60,20 @@ describe("rag ask", () => {
     expect(request.tools).toEqual([]);
   });
 
+  it("--rag-answer-prompt=compact: модель получает инструкцию answer-compact.md вместо answer.md", async () => {
+    const compact = await invoke(
+      ["--rag-retrieval-mode=baseline", "--rag-answer-prompt=compact", "rag", "ask", "Вопрос"],
+      { cwd, embeddings: fakeEmbeddings() },
+    );
+    const standard = await invoke(["--rag-retrieval-mode=baseline", "rag", "ask", "Вопрос"], {
+      cwd,
+      embeddings: fakeEmbeddings(),
+    });
+    expect(compact.code).toBe(0);
+    expect(requestOf(compact).messages[0]?.content).toContain("символ в символ");
+    expect(requestOf(standard).messages[0]?.content).not.toContain("символ в символ");
+  });
+
   it("--rag-top-k ограничивает число фрагментов", async () => {
     const baseline = "--rag-retrieval-mode=baseline";
     const one = await invoke([baseline, "--rag-top-k=1", "rag", "ask", "Вопрос"], {
@@ -145,7 +159,7 @@ describe("режим сессии REPL", () => {
     const result = await invoke([], { cwd, input, embeddings: fakeEmbeddings(), complete: echoWithRewrite() });
     expect(result.code).toBe(0);
     expect(result.output).toContain(
-      "── Режим ──\n\nОтветы с RAG: стратегия structure, режим rewrite-filter, кандидатов 10, итоговый top-5, порог 0.55.",
+      "── Режим ──\n\nОтветы с RAG: стратегия structure, режим rewrite-filter, кандидатов 10, итоговый top-5, порог 0.55, шаблон default.",
     );
     expect(result.output).toContain("Ответы без RAG.");
     expect(result.output.match(/── Ответ агента · RAG-чат · deepseek · deepseek-flash ──/g)).toHaveLength(1);

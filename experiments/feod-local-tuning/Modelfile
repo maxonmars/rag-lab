@@ -1,0 +1,4 @@
+# Модель ответов после оптимизации: те же веса nvfp4, temperature 0.2, контекст 16384.
+FROM qwen3.8:27b-mlx
+PARAMETER temperature 0.2
+PARAMETER num_ctx 16384

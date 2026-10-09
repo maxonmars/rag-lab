@@ -30,6 +30,7 @@ function setup(overrides: Partial<CitationEvalOptions> = {}, modelOptions: FakeM
     threshold: 0.65,
     model: fake.model,
     systemPrompt: "Системная инструкция.",
+    answerPrompt: "default",
     meta: { questionsFile: "experiments/feod-citations/questions.md", llmModel: "deepseek-flash" },
     now: () => new Date("2026-10-01T12:00:00Z"),
     ...overrides,
@@ -140,8 +141,12 @@ describe("evaluateCitations: отчёт", () => {
     expect(text).toContain("Прогон 2026-10-01T12:00:00.000Z. Вопросы: `experiments/feod-citations/questions.md` (3).");
     expect(text).toContain("модель эмбеддингов `bge-m3:latest` (digest 790764642607)");
     expect(text).toContain("Модель ответов и переписывания запроса: `deepseek-flash`.");
+    expect(text).toContain("Шаблон ответа: `default` (prompts/answer.md).");
     expect(text).toContain(
       "стратегия structure, режим rewrite-filter, кандидатов 4, итоговый top-3, порог 0.65 (применяется)",
+    );
+    expect(await report({ answerPrompt: "compact" })).toContain(
+      "Шаблон ответа: `compact` (prompts/answer-compact.md).",
     );
     expect(await report({ mode: "baseline" })).toContain(
       "режим baseline, кандидатов 4, итоговый top-3, порог 0.65 (в этом режиме не применяется)",

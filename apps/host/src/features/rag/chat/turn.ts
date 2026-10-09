@@ -1,5 +1,5 @@
 import { Agent, AgentError, type ModelPort } from "../../../core/index.ts";
-import { generateAnswer } from "../answer.ts";
+import { type AnswerPrompt, generateAnswer } from "../answer.ts";
 import { readPrompt } from "../prompts.ts";
 import {
   checkRetrievalParams,
@@ -28,6 +28,7 @@ export type ChatTurnOptions = RetrievalParams &
     mode: RetrievalMode;
     model: ModelPort;
     systemPrompt: string;
+    answerPrompt: AnswerPrompt;
     historyTurns: number;
   }>;
 
@@ -77,6 +78,7 @@ export async function chatTurn(options: ChatTurnOptions): Promise<ChatTurnResult
     generateAnswer({
       model: options.model,
       systemPrompt: options.systemPrompt,
+      answerPrompt: options.answerPrompt,
       question,
       selection,
       threshold: usesFilter(mode) ? options.threshold : null,

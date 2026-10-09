@@ -12,7 +12,9 @@
 - [feod-chat](feod-chat/README.md) — два сценария RAG-чата по 12–13 реплик ([scenarios.md](feod-chat/scenarios.md)): история,
   память задачи, источники в каждом ответе, измерения `rag dialog` и ручная оценка;
 - [feod-local-llm](feod-local-llm/README.md) — те же 10 вопросов ([questions.md](feod-citations/questions.md)): DeepSeek и локальная
-  модель по 3 прогона `rag citations`, сравнение качества, скорости и стабильности.
+  модель по 3 прогона `rag citations`, сравнение качества, скорости и стабильности;
+- [feod-local-tuning](feod-local-tuning/README.md) — те же 10 вопросов: локальная модель до и после оптимизации (параметры в
+  Modelfile, шаблон ответа `compact`), 3 конфигурации по 3 прогона `rag citations`, качество, скорость и ресурсы.
 
 Runner экспериментов не реализован: `rag calibrate` и `rag eval` считают hit@K, MRR и покрытие ожидаемых файлов по итоговым
 чанкам; это метрики попадания файлов, а не релевантности чанков и не качества ответа. `rag citations` считает долю ответов с

@@ -73,6 +73,7 @@ describe("generateAnswer с chat", () => {
     await generateAnswer({
       model,
       systemPrompt: "S",
+      answerPrompt: "default",
       question: "Вопрос",
       selection,
       threshold: null,
@@ -91,6 +92,7 @@ describe("generateAnswer с chat", () => {
     const result = await generateAnswer({
       model,
       systemPrompt: "S",
+      answerPrompt: "default",
       question: "Вопрос",
       selection: empty,
       threshold: 0.9,

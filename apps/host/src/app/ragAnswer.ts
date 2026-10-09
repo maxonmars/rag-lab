@@ -45,7 +45,7 @@ export function modeLines(enabled: boolean, config: ResolvedConfig): string[] {
   const threshold = usesFilter(mode) ? `, порог ${values["rag.similarityThreshold"]}` : "";
   const limits = `кандидатов ${values["rag.candidateTopK"]}, итоговый top-${values["rag.topK"]}`;
   return [
-    `Ответы с RAG: стратегия ${values["rag.chunkStrategy"]}, режим ${mode}, ${limits}${threshold}.`,
+    `Ответы с RAG: стратегия ${values["rag.chunkStrategy"]}, режим ${mode}, ${limits}${threshold}, шаблон ${values["rag.answerPrompt"]}.`,
     "Обычные строки и /ask ищут по индексу.",
     `Ответы учитывают историю (последние ${values["rag.historyTurns"]} ходов) и память задачи; /rag state показывает память, /rag reset сбрасывает диалог.`,
   ];
@@ -97,7 +97,15 @@ export async function prepareRag(options: RagAnswerHandlerOptions) {
   const model = createConfiguredModel(config, options.createModel);
   const embeddings = configuredEmbeddings(config, options.createEmbeddings);
   const index = await openIndex({ indexFile: paths.indexFile, embeddings });
-  return { values: config.values, paths, model, modelName: modelLabel(config), index, retrieval };
+  return {
+    values: config.values,
+    paths,
+    model,
+    modelName: modelLabel(config),
+    index,
+    retrieval,
+    answerPrompt: config.values["rag.answerPrompt"],
+  };
 }
 
 export function createRagAnswerHandlers(options: RagAnswerHandlerOptions) {
@@ -105,13 +113,14 @@ export function createRagAnswerHandlers(options: RagAnswerHandlerOptions) {
 
   return {
     async ask(text: string): Promise<RagReply> {
-      const { values, model, index, retrieval } = await prepare();
+      const { values, model, index, retrieval, answerPrompt } = await prepare();
       const mode = values["rag.retrievalMode"];
       const result = await answerWithRag({
         question: text,
         index,
         model,
         systemPrompt: systemPrompt(),
+        answerPrompt,
         mode,
         ...retrieval,
       });
@@ -119,13 +128,14 @@ export function createRagAnswerHandlers(options: RagAnswerHandlerOptions) {
     },
 
     async evaluate(): Promise<RagOutcome> {
-      const { values, paths, model, modelName, index, retrieval } = await prepare();
+      const { values, paths, model, modelName, index, retrieval, answerPrompt } = await prepare();
       const result = await evaluateQuestions({
         questionsFile: paths.questionsFile,
         reportFile: paths.evalFile,
         index,
         model,
         systemPrompt: systemPrompt(),
+        answerPrompt,
         ...retrieval,
         meta: { questionsFile: values["rag.questionsFile"], llmModel: modelName },
         onProgress: (event) => options.view.progress(`${event.id}: ${STEP_LABELS[event.step]}`),
@@ -134,7 +144,7 @@ export function createRagAnswerHandlers(options: RagAnswerHandlerOptions) {
     },
 
     async citations(): Promise<RagOutcome> {
-      const { values, paths, model, modelName, index, retrieval } = await prepare();
+      const { values, paths, model, modelName, index, retrieval, answerPrompt } = await prepare();
       const mode = values["rag.retrievalMode"];
       const result = await evaluateCitations({
         questionsFile: paths.questionsFile,
@@ -142,6 +152,7 @@ export function createRagAnswerHandlers(options: RagAnswerHandlerOptions) {
         index,
         model,
         systemPrompt: systemPrompt(),
+        answerPrompt,
         mode,
         ...retrieval,
         meta: { questionsFile: values["rag.questionsFile"], llmModel: modelName },

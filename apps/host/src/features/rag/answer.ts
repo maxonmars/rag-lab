@@ -16,6 +16,15 @@ import { type Selection, selectForMode } from "./select.ts";
 import { timed, timedSync } from "./timing.ts";
 import type { Strategy } from "./types.ts";
 
+export const ANSWER_PROMPTS = ["default", "compact"] as const;
+export type AnswerPrompt = (typeof ANSWER_PROMPTS)[number];
+
+/** Файл шаблона ответа в prompts/. */
+export const ANSWER_PROMPT_FILES: Readonly<Record<AnswerPrompt, string>> = {
+  default: "answer.md",
+  compact: "answer-compact.md",
+};
+
 /** Длительности этапов, мс; для режимов без rewrite `rewriteMs` равен 0. */
 export type StageTimings = Readonly<{ rewriteMs: number; searchMs: number; selectMs: number; generateMs: number }>;
 
@@ -37,11 +46,13 @@ export type RagAnswerOptions = RetrievalParams &
     mode: RetrievalMode;
     model: ModelPort;
     systemPrompt: string;
+    answerPrompt: AnswerPrompt;
   }>;
 
 export type GenerationOptions = Readonly<{
   model: ModelPort;
   systemPrompt: string;
+  answerPrompt: AnswerPrompt;
   question: string;
   selection: Selection;
   /** Порог режима с фильтром; `null` — режим без порога. */
@@ -61,7 +72,11 @@ export async function generateAnswer(
   if (hits.length === 0) return { answer: retrievalRefusal(options.selection, options.threshold), contextChars: 0 };
   const { chat } = options;
   const message = renderRagMessage(options.question, hits, chat?.memory);
-  const instruction = [options.systemPrompt, readPrompt("answer.md"), ...(chat ? [readPrompt("chat.md")] : [])];
+  const instruction = [
+    options.systemPrompt,
+    readPrompt(ANSWER_PROMPT_FILES[options.answerPrompt]),
+    ...(chat ? [readPrompt("chat.md")] : []),
+  ];
   const raw = await new Agent(options.model, instruction.join("\n\n")).respond(
     message,
     chat ? { history: chat.history } : {},
@@ -69,7 +84,7 @@ export async function generateAnswer(
   return { answer: parseCitedAnswer(raw, hits), contextChars: [...message].length };
 }
 
-/** Rewrite (по режиму) → поиск кандидатов → отбор → генерация (при пустом отборе — отказ без модели); системная инструкция — та же, что без RAG, плюс prompts/answer.md. */
+/** Rewrite (по режиму) → поиск кандидатов → отбор → генерация (при пустом отборе — отказ без модели); системная инструкция — та же, что без RAG, плюс шаблон ответа (prompts/answer.md или answer-compact.md). */
 export async function answerWithRag(options: RagAnswerOptions): Promise<RagAnswer> {
   const question = options.question.trim();
   if (!question) throw new AgentError("EMPTY_INPUT");
@@ -84,6 +99,7 @@ export async function answerWithRag(options: RagAnswerOptions): Promise<RagAnswe
     generateAnswer({
       model: options.model,
       systemPrompt: options.systemPrompt,
+      answerPrompt: options.answerPrompt,
       question,
       selection: selection.value,
       threshold: usesFilter(options.mode) ? options.threshold : null,

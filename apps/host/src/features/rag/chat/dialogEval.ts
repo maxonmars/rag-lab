@@ -1,4 +1,5 @@
 import type { ModelPort } from "../../../core/index.ts";
+import type { AnswerPrompt } from "../answer.ts";
 import { writeFileAtomic } from "../atomicWrite.ts";
 import { checkRetrievalParams, type RetrievalMode, type RetrievalParams } from "../retrieval.ts";
 import type { SearchIndex } from "../search.ts";
@@ -20,6 +21,7 @@ export type DialogEvalOptions = RetrievalParams &
     mode: RetrievalMode;
     model: ModelPort;
     systemPrompt: string;
+    answerPrompt: AnswerPrompt;
     historyTurns: number;
     /** Значения только для шапки отчёта. */
     meta: Readonly<{ scenariosFile: string; llmModel: string }>;
@@ -71,6 +73,7 @@ export async function evaluateDialogs(options: DialogEvalOptions): Promise<Dialo
       historyTurns: options.historyTurns,
       scenariosFile: options.meta.scenariosFile,
       llmModel: options.meta.llmModel,
+      answerPrompt: options.answerPrompt,
       wallMs,
       runs,
       metrics,

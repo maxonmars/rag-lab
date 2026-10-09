@@ -140,9 +140,9 @@ describe("настройки поиска через YAML, env и CLI", () => {
   it("/rag on показывает режим, лимиты и порог; для режимов без фильтра порога в строке нет", async () => {
     writeFileSync(join(cwd, "lab.config.yaml"), file);
     const filter = await invoke([], { cwd, input: "/rag on\n/exit\n" });
-    expect(filter.output).toContain("режим filter, кандидатов 8, итоговый top-3, порог 0.9.");
+    expect(filter.output).toContain("режим filter, кандидатов 8, итоговый top-3, порог 0.9, шаблон default.");
     const baseline = await invoke(["--rag-retrieval-mode=baseline"], { cwd, input: "/rag on\n/exit\n" });
-    expect(baseline.output).toContain("режим baseline, кандидатов 8, итоговый top-3.");
+    expect(baseline.output).toContain("режим baseline, кандидатов 8, итоговый top-3, шаблон default.");
   });
 
   it("строка REPL при включённом RAG идёт по настроенному конвейеру", async () => {
