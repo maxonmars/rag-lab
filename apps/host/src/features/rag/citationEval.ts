@@ -1,14 +1,14 @@
-import type { ModelPort } from "../../core/index.ts";
+import { AgentError, type AgentErrorCode, type ModelPort } from "../../core/index.ts";
 import { answerWithRag } from "./answer.ts";
 import { writeFileAtomic } from "./atomicWrite.ts";
 import { type CitationMetrics, type CitationResult, citationMetrics } from "./citationMetrics.ts";
 import { renderCitationReport } from "./citationReport.ts";
-import { loadQuestions, requireIndexedSources } from "./questions.ts";
+import { type ControlQuestion, loadQuestions, requireIndexedSources } from "./questions.ts";
 import { checkRetrievalParams, type RetrievalMode, type RetrievalParams } from "./retrieval.ts";
 import type { SearchIndex } from "./search.ts";
 import type { Strategy } from "./types.ts";
 
-export type CitationProgress = Readonly<{ id: string }>;
+export type CitationProgress = Readonly<{ id: string; failed?: AgentErrorCode }>;
 
 export type CitationEvalOptions = RetrievalParams &
   Readonly<{
@@ -33,16 +33,9 @@ export type CitationEvalResult = Readonly<{
   metrics: CitationMetrics;
 }>;
 
-/** Вопросы идут последовательно; первая ошибка прерывает прогон, и отчёт не пишется. */
-export async function evaluateCitations(options: CitationEvalOptions): Promise<CitationEvalResult> {
-  checkRetrievalParams(options);
-  const questions = loadQuestions(options.questionsFile);
-  requireIndexedSources(questions, options.index.files);
-  const now = (options.now ?? (() => new Date()))();
+async function answerQuestion(question: ControlQuestion, options: CitationEvalOptions): Promise<CitationResult> {
   const started = performance.now();
-  const results: CitationResult[] = [];
-  for (const question of questions) {
-    options.onProgress?.({ id: question.id });
+  try {
     const result = await answerWithRag({
       question: question.question,
       index: options.index,
@@ -54,7 +47,25 @@ export async function evaluateCitations(options: CitationEvalOptions): Promise<C
       model: options.model,
       systemPrompt: options.systemPrompt,
     });
-    results.push({ question, result });
+    return { question, result };
+  } catch (error) {
+    if (!(error instanceof AgentError)) throw error;
+    options.onProgress?.({ id: question.id, failed: error.code });
+    return { question, failure: { code: error.code, data: error.data, elapsedMs: performance.now() - started } };
+  }
+}
+
+/** Вопросы идут последовательно; ошибка модели (`AgentError`) становится исходом вопроса, прочие ошибки прерывают прогон, и отчёт не пишется. */
+export async function evaluateCitations(options: CitationEvalOptions): Promise<CitationEvalResult> {
+  checkRetrievalParams(options);
+  const questions = loadQuestions(options.questionsFile);
+  requireIndexedSources(questions, options.index.files);
+  const now = (options.now ?? (() => new Date()))();
+  const started = performance.now();
+  const results: CitationResult[] = [];
+  for (const question of questions) {
+    options.onProgress?.({ id: question.id });
+    results.push(await answerQuestion(question, options));
   }
   const wallMs = performance.now() - started;
   const metrics = citationMetrics(results);

@@ -100,8 +100,8 @@ export function fakeSearchIndex(
 export type FakeModelOptions = Readonly<{
   rewrite?: (question: string) => string;
   answer?: (user: string) => string;
-  /** Номер вызова этого вида (с 1), который завершится ошибкой. */
-  failOn?: Readonly<{ kind: "rewrite" | "answer"; call: number }>;
+  /** Номер вызова этого вида (с 1), который завершится ошибкой; без `error` — обычный `Error`. */
+  failOn?: Readonly<{ kind: "rewrite" | "answer"; call: number; error?: Error }>;
   onCall?: (kind: "rewrite" | "answer") => void;
 }>;
 
@@ -116,7 +116,8 @@ export function fakeModel(options: FakeModelOptions = {}) {
       kinds.push(kind);
       options.onCall?.(kind);
       const call = kinds.filter((item) => item === kind).length;
-      if (options.failOn?.kind === kind && options.failOn.call === call) throw new Error("сбой модели");
+      if (options.failOn?.kind === kind && options.failOn.call === call)
+        throw options.failOn.error ?? new Error("сбой модели");
       const user = String(request.messages[1]?.content);
       const rewrite = options.rewrite ?? ((question: string) => `запрос: ${question}`);
       const answer = options.answer ?? ((text: string) => `ответ: ${text.slice(-30)}`);

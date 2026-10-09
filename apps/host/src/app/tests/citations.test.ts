@@ -2,7 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ModelRequest } from "../../core/index.ts";
+import { AgentError, type ModelRequest } from "../../core/index.ts";
 import { type CompleteMock, invoke, keywordEmbeddings, writeCorpus } from "./harness.ts";
 
 const QUESTIONS = [
@@ -74,8 +74,29 @@ describe("rag citations", () => {
     );
     expect(result.output).toContain("Отрицательные: «не знаю» 1 из 1 (пустой контекст 1, моделью 0)");
     expect(result.output).toContain("Цитаты дословно: 1 из 1; ответов без замечаний: 2 из 2");
+    expect(result.output).toContain("Ошибки модели: 0 из 2");
+    expect(result.output).toContain("Генерация: медиана ");
     expect(result.output).toContain("Длительность прогона: ");
     expect(result.output).toContain(`Сохранено: ${report()}`);
+  });
+
+  it("ошибка модели на ответе не прерывает команду: ход сообщает код, сводка считает ошибку", async () => {
+    const complete: CompleteMock = vi.fn(async (request: ModelRequest) => {
+      if (!String(request.messages[0]?.content).includes("переписываешь")) {
+        throw new AgentError("MODEL_FAILURE", { status: 500 });
+      }
+      return {
+        type: "text" as const,
+        content: String(request.messages[1]?.content).includes("слово") ? "слово" : "ничего",
+      };
+    });
+    const flags = ["--rag-questions-file=own/questions.md", "rag", "citations"];
+    const result = await invoke(flags, { cwd, embeddings: embeddings(), complete });
+    expect(result.code).toBe(0);
+    expect(result.error).toContain("q01: ошибка модели MODEL_FAILURE");
+    expect(result.output).toContain("Ошибки модели: 1 из 2");
+    expect(result.output).toContain("Генерация: модель не вызывалась");
+    expect(existsSync(report())).toBe(true);
   });
 
   it("отчёт содержит chunk_id фрагмента, проверку цитаты и отказ без вызова модели", async () => {

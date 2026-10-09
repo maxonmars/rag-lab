@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
+import { AgentError } from "../../../core/index.ts";
 import { type CitationEvalOptions, type CitationProgress, evaluateCitations } from "../citationEval.ts";
 import { RagError } from "../errors.ts";
 import { evalRoot } from "./evalSetup.ts";
@@ -66,6 +67,17 @@ describe("evaluateCitations: вызовы", () => {
     await evaluateCitations(options);
     expect(events).toEqual([{ id: "q01" }, { id: "q02" }, { id: "q03" }]);
   });
+
+  it("ошибку модели сообщает после начала вопроса, прогон продолжается", async () => {
+    const events: CitationProgress[] = [];
+    const error = new AgentError("MODEL_FAILURE", { status: 500 });
+    const { options } = setup(
+      { onProgress: (event) => events.push(event) },
+      { failOn: { kind: "answer", call: 1, error } },
+    );
+    await evaluateCitations(options);
+    expect(events).toEqual([{ id: "q01" }, { id: "q01", failed: "MODEL_FAILURE" }, { id: "q02" }, { id: "q03" }]);
+  });
 });
 
 describe("evaluateCitations: метрики", () => {
@@ -88,6 +100,8 @@ describe("evaluateCitations: метрики", () => {
       quotes: 2,
       verifiedQuotes: 2,
       clean: 3,
+      failed: 0,
+      timing: expect.any(Object),
     });
   });
 
@@ -145,8 +159,9 @@ describe("evaluateCitations: отчёт", () => {
 
   it("таблица вопросов и разделы вопросов: исход, фрагменты с chunk_id, цитаты и пустой контекст", async () => {
     const text = await report();
-    expect(text).toContain("| q01 | `a.md` | ответ | 0.900 | 1 из 1 | 1 из 1 | — |");
-    expect(text).toContain("| q03 | — | не знаю (пустой контекст) | 0.400 | — | — | — |");
+    expect(text).toMatch(/\| q01 \| `a\.md` \| ответ \| 0\.900 \| 1 из 1 \| 1 из 1 \| \d+\.\d \| \d+\.\d \| — \|/);
+    expect(text).toMatch(/\| q03 \| — \| не знаю \(пустой контекст\) \| 0\.400 \| — \| — \| \d+\.\d \| — \| — \|/);
+    expect(text).toMatch(/Сообщение: \d+ символов · rewrite \d+\.\d с · поиск \d+\.\d с · генерация \d+\.\d с/);
     expect(text).toContain("| 1 | 0.900 | `a.md` | Doc › a.md | `a.md#1` |");
     expect(text).toContain("> - [1] «Первый фрагмент подробно описывает порядок работы» — найдена во фрагменте 1");
     expect(text).toContain("Контекст пуст: модель не вызывалась.");
@@ -157,8 +172,21 @@ describe("evaluateCitations: отчёт", () => {
     const { options } = setup({}, { answer: () => "Свободный текст." });
     await evaluateCitations(options);
     const text = readFileSync(options.reportFile, "utf8");
-    expect(text).toContain("| q01 | `a.md` | ответ | 0.900 | — | — | ответ не разбит на разделы");
+    expect(text).toMatch(
+      /\| q01 \| `a\.md` \| ответ \| 0\.900 \| — \| — \| \d+\.\d \| \d+\.\d \| ответ не разбит на разделы/,
+    );
     expect(text).toContain("| Ответы без замечаний | 1 из 3 |");
+  });
+
+  it("отчёт содержит раздел времени этапов", async () => {
+    const text = await report();
+    expect(text).toContain("## Время этапов");
+    expect(text).toContain("| Этап | Вопросов | Медиана, с | Максимум, с |");
+    expect(text).toMatch(/\| Переписывание запроса \| 3 \| \d+\.\d \| \d+\.\d \|/);
+    expect(text).toMatch(/\| Поиск \| 3 \| \d+\.\d \| \d+\.\d \|/);
+    expect(text).toMatch(/\| Генерация ответа \| 2 \| \d+\.\d \| \d+\.\d \|/);
+    expect(text).toMatch(/\| Все этапы \| 3 \| \d+\.\d \| \d+\.\d \|/);
+    expect(await report({ mode: "baseline" })).toContain("| Переписывание запроса | 0 | — | — |");
   });
 
   it("пустые знаменатели — «—», без NaN", async () => {
@@ -172,7 +200,7 @@ describe("evaluateCitations: отчёт", () => {
 describe("evaluateCitations: сбои и проверки до внешних вызовов", () => {
   const OLD_REPORT = "# Прежний отчёт\n";
 
-  it("ошибка модели прерывает прогон, прежний отчёт остаётся целым", async () => {
+  it("сбой, не являющийся AgentError, прерывает прогон, прежний отчёт остаётся целым", async () => {
     const { options } = setup();
     await evaluateCitations(options);
     writeFileSync(options.reportFile, OLD_REPORT);
@@ -180,6 +208,34 @@ describe("evaluateCitations: сбои и проверки до внешних в
     await expect(evaluateCitations(failing.options)).rejects.toThrow("сбой модели");
     expect(readFileSync(options.reportFile, "utf8")).toBe(OLD_REPORT);
     expect(readdirSync(join(root.path, "out"))).toEqual([REPORT_NAME]);
+  });
+
+  it("AgentError на ответе — исход вопроса, прогон доходит до конца и пишет отчёт", async () => {
+    const error = new AgentError("MODEL_FAILURE", { status: 500 });
+    const { options } = setup({}, { failOn: { kind: "answer", call: 1, error } });
+    const result = await evaluateCitations(options);
+    expect(result.questions).toBe(3);
+    expect(result.metrics).toMatchObject({
+      failed: 1,
+      withSources: 1,
+      positives: 2,
+      clean: 2,
+      unknownByRetrieval: 1,
+    });
+    const text = readFileSync(options.reportFile, "utf8");
+    expect(text).toContain("| Ошибки модели (вопрос без ответа) | 1 из 3 |");
+    expect(text).toContain("| q01 | `a.md` | ошибка `MODEL_FAILURE` | — | — | — | — | — | — |");
+    expect(text).toContain("**Ошибка модели:** `MODEL_FAILURE` (status 500) через");
+    const section = text.slice(text.indexOf("## q01."), text.indexOf("## q02."));
+    expect(section).not.toContain("**Запрос поиска:**");
+  });
+
+  it("AgentError на rewrite — исход вопроса", async () => {
+    const error = new AgentError("INCOMPLETE_RESPONSE", { reason: "length" });
+    const { options } = setup({}, { failOn: { kind: "rewrite", call: 3, error } });
+    const { metrics } = await evaluateCitations(options);
+    expect(metrics).toMatchObject({ failed: 1, unknownByRetrieval: 0 });
+    expect(readFileSync(options.reportFile, "utf8")).toContain("`INCOMPLETE_RESPONSE` (reason length) через");
   });
 
   it("несогласованные K отклоняются до поиска и модели", async () => {

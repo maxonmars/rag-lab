@@ -14,7 +14,7 @@ CLI, реестры настроек и команд, tooling. MCP-фичи и �
 RAG-чат с памятью (ADR 0006): в режиме `/rag on` реплика идёт с историей последних ходов и памятью задачи (цель, уточнения,
 ограничения и термины), с источниками и цитатами; `rag state`, `rag reset`, `rag dialog` пишет отчёт `rag-dialog.md`.
 Локальная модель (ADR 0007): `llm.provider` переключает ответы, rewrite и память задачи между DeepSeek и локальным
-OpenAI-совместимым сервером; эмбеддинги всегда в Ollama. Диалог живёт только в памяти сессии REPL. Специализированного реранкинга нет. Задания выдаются по одному;
+OpenAI-совместимым сервером; эмбеддинги всегда в Ollama. `rag citations` сравнивает провайдеров: показывает время этапов и ошибки модели, эксперимент feod-local-llm. Диалог живёт только в памяти сессии REPL. Специализированного реранкинга нет. Задания выдаются по одному;
 docs/course.md — ориентир недели, он не разрешает реализовывать будущие задания заранее.
 Перед заданием сформулируй учебную цель и минимальный результат; улучшения отдели явно.
 
@@ -26,7 +26,7 @@ docs/course.md — ориентир недели, он не разрешает �
 | apps/host/src/adapters/cli | Ввод, dispatch, REPL, отображение ошибок |
 | apps/host/src/app | Единственная композиция host, реестры, Markdown-инструкции |
 | apps/host/src/features/rag | Индексация и RAG-запрос: корпус, чанкинг, эмбеддинги Ollama, индекс, сравнение, поиск, rewrite, отбор по порогу, ответ, цитаты и режим «не знаю», калибровка, контрольные вопросы, чат (`chat/`: диалог, память задачи, ход, сценарии) |
-| experiments | Отчёты сравнений и контрольные вопросы: измерения, ручные оценки, выводы (feod-chunking, feod-rag, feod-retrieval, feod-citations, feod-chat) |
+| experiments | Отчёты сравнений и контрольные вопросы: измерения, ручные оценки, выводы (feod-chunking, feod-rag, feod-retrieval, feod-citations, feod-chat, feod-local-llm) |
 | docs/adr, docs/demos | Решения и короткие ручные демонстрации |
 | tooling | Архитектурные проверки, документация, сборка, подготовка корпуса |
 
@@ -99,7 +99,7 @@ dependency-cruiser проверяет границы, циклы и import type.
 - Измерения отделены от оценок и симуляций; ограничения названы явно (одиночный прогон, источник чисел).
 
 ## Команды разработки
-Node 24; npm ci; npm run hooks:install; npm run dev; npm run dev -- help.
+Node 24; npm ci; npm run hooks:install; npm run dev; npm run dev -- help; npm run dev:local — профиль lab.local.yaml (локальная модель).
 npm run corpus:feod; npm run dev -- rag index; npm run dev -- rag compare.
 npm run dev -- rag calibrate; npm run dev -- rag ask "вопрос"; npm run dev -- rag eval; npm run dev -- rag citations; npm run dev -- rag dialog; в REPL — /rag on, /rag off, /rag state, /rag reset.
 npm run lint; npm run typecheck; npm test; npm run test:coverage; npm run build.

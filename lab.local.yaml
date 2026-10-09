@@ -1,0 +1,3 @@
+# Профиль локальной модели: npm run dev:local. Заменяет lab.config.yaml целиком, остальные настройки — по умолчанию.
+llm.provider: local
+llm.localModel: rag-local

@@ -11,6 +11,7 @@
   },
   "scripts": {
     "dev": "npm run dev --workspace @rag-lab/host --",
+    "dev:local": "npm run dev -- --config-file lab.local.yaml",
     "start": "npm run start --workspace @rag-lab/host --",
     "build": "node tooling/build.ts",
     "typecheck": "tsc --noEmit",

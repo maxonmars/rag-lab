@@ -1,0 +1,3 @@
+# Модель ответов для llm.provider: local — qwen3.8:27b-mlx с контекстом, вмещающим RAG-запрос с историей.
+FROM qwen3.8:27b-mlx
+PARAMETER num_ctx 32768
