@@ -46,21 +46,22 @@ ollama ps
 
 ## 6. Приложение на локальной модели
 
-Контекст Ollama по умолчанию может не вместить RAG-запрос с историей, переполнение обрезается молча. Модель `rag-local` из
-[Modelfile](../../experiments/feod-local-llm/Modelfile) — `qwen3.8:27b-mlx` с `num_ctx 32768`; создаётся один раз, веса не копируются:
+Контекст Ollama по умолчанию может не вместить RAG-запрос с историей, переполнение обрезается молча. Модель `rag-local-opt` из
+[Modelfile](../../experiments/feod-local-tuning/Modelfile) — `qwen3.8:27b-mlx` с `num_ctx 16384` и `temperature 0.2`; создаётся один раз,
+веса не копируются:
 
 ```bash
-ollama create rag-local -f experiments/feod-local-llm/Modelfile
+ollama create rag-local-opt -f experiments/feod-local-tuning/Modelfile
 ```
 
-Профиль [lab.local.yaml](../../lab.local.yaml) выбирает `llm.provider: local` и `rag-local`. Он заменяет `lab.config.yaml`,
+Профиль [lab.local.yaml](../../lab.local.yaml) выбирает `llm.provider: local` и `rag-local-opt` (шаблон ответа по умолчанию). Он заменяет `lab.config.yaml`,
 остальные настройки берутся по умолчанию. REPL на локальной модели:
 
 ```bash
 npm run dev:local
 ```
 
-Ожидание: баннер `── rag-lab ──` и под ним строка `Модель: local · rag-local`. `LAB_LLM_API_KEY` из `.env` локальной модели
+Ожидание: баннер `── rag-lab ──` и под ним строка `Модель: local · rag-local-opt`. `LAB_LLM_API_KEY` из `.env` локальной модели
 не передаётся.
 
 В REPL:
@@ -72,7 +73,7 @@ npm run dev:local
 /rag state
 ```
 
-Ожидание: блоки `── Ответ агента · RAG-чат · local · rag-local ──` с `Источники:`, `Цитаты:`, `Фрагменты:`, `Цель:` и `Память:`;
+Ожидание: блоки `── Ответ агента · RAG-чат · local · rag-local-opt ──` с `Источники:`, `Цитаты:`, `Фрагменты:`, `Цель:` и `Память:`;
 `/rag state` показывает память задачи. Индекс должен быть построен (`rag index`).
 
 Обе локальные модели загружены — `ollama ps` показывает `bge-m3` и модель ответов:
@@ -96,13 +97,13 @@ npm run dev:local -- rag ask "Какие верхние уровни испол�
 ollama ps
 ```
 
-Ожидание: `bge-m3` и `rag-local`, в колонке CONTEXT у `rag-local` — 32768. Затем контрольные вопросы:
+Ожидание: `bge-m3` и `rag-local-opt`, в колонке CONTEXT у `rag-local-opt` — 16384. Затем контрольные вопросы:
 
 ```bash
 npm run dev:local -- rag citations --rag-questions-file experiments/feod-citations/questions.md
 ```
 
-Ожидание: в шапке `.local/rag/rag-citations.md` — `local · rag-local`, в отчёте раздел «Время этапов» и строка «Ошибки модели».
+Ожидание: в шапке `.local/rag/rag-citations.md` — `local · rag-local-opt`, в отчёте раздел «Время этапов» и строка «Ошибки модели».
 Необязательно: тот же прогон с отключённой сетью, чтобы убедиться, что облако не участвует.
 Сравнение с DeepSeek по качеству, скорости и стабильности — [experiments/feod-local-llm/README.md](../../experiments/feod-local-llm/README.md).
 

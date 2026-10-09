@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { AgentError } from "../../../core/index.ts";
-import { answerWithRag, generateAnswer, type RagAnswerOptions } from "../answer.ts";
+import {
+  ANSWER_PROMPT_FILES,
+  ANSWER_PROMPTS,
+  answerWithRag,
+  generateAnswer,
+  type RagAnswerOptions,
+} from "../answer.ts";
 import { renderRagMessage } from "../context.ts";
 import { readPrompt } from "../prompts.ts";
 import type { SearchHit } from "../search.ts";
@@ -21,6 +27,7 @@ function setup(overrides: Partial<RagAnswerOptions> = {}, modelOptions: Paramete
     threshold: 0.5,
     model,
     systemPrompt: "Системная инструкция.",
+    answerPrompt: "default",
     ...overrides,
   };
   return { options, search, requests, kinds };
@@ -45,6 +52,15 @@ describe("answerWithRag", () => {
     });
     expect(result.answer).toMatchObject({ kind: "answer", problems: [{ code: "format" }] });
     expect(result.answer).toMatchObject({ raw: expect.stringContaining("ответ:") });
+  });
+
+  it("compact: системное сообщение содержит answer-compact.md вместо answer.md", async () => {
+    const { options, requests } = setup({ answerPrompt: "compact" });
+    await answerWithRag(options);
+    expect(requests[0]?.messages[0]).toEqual({
+      role: "system",
+      content: `Системная инструкция.\n\n${readPrompt("answer-compact.md")}`,
+    });
   });
 
   it("filter не вызывает rewrite и убирает кандидатов ниже порога", async () => {
@@ -171,6 +187,7 @@ describe("generateAnswer", () => {
     const result = await generateAnswer({
       model,
       systemPrompt: "S",
+      answerPrompt: "default",
       question: "Исходный вопрос",
       selection,
       threshold: null,
@@ -179,5 +196,14 @@ describe("generateAnswer", () => {
     expect(requests).toHaveLength(1);
     expect(requests[0]?.messages[1]?.content).toBe(message);
     expect(result.contextChars).toBe([...message].length);
+  });
+});
+
+describe("шаблоны ответа", () => {
+  it.each(ANSWER_PROMPTS)("%s: файл содержит все заголовки, которые разбирает citations.ts", (name) => {
+    const text = readPrompt(ANSWER_PROMPT_FILES[name]);
+    for (const heading of ["## Ответ", "## Источники", "## Цитаты", "## Не знаю", "## Уточнение"]) {
+      expect(text).toContain(heading);
+    }
   });
 });

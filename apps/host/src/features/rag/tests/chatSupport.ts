@@ -67,6 +67,7 @@ export function chatSetup(overrides: Partial<ChatTurnOptions> = {}, modelOptions
     threshold: 0.6,
     model: fake.model,
     systemPrompt: "Системная инструкция.",
+    answerPrompt: "default",
     historyTurns: 6,
     ...overrides,
   };

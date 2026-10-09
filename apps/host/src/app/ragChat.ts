@@ -49,13 +49,14 @@ export function createRagChatHandlers(options: RagAnswerHandlerOptions) {
   return {
     /** Диалог меняется только в возвращённом значении: ошибка хода оставляет прежний диалог вызывающему. */
     async chat(dialog: Dialog, text: string): Promise<Readonly<{ reply: ChatReply; dialog: Dialog }>> {
-      const { values, model, index, retrieval } = await prepareRag(options);
+      const { values, model, index, retrieval, answerPrompt } = await prepareRag(options);
       const result = await chatTurn({
         dialog,
         question: text,
         index,
         model,
         systemPrompt: systemPrompt(),
+        answerPrompt,
         mode: values["rag.retrievalMode"],
         historyTurns: values["rag.historyTurns"],
         ...retrieval,
@@ -71,7 +72,7 @@ export function createRagChatHandlers(options: RagAnswerHandlerOptions) {
     },
 
     async dialogs(): Promise<RagOutcome> {
-      const { values, paths, model, modelName, index, retrieval } = await prepareRag(options);
+      const { values, paths, model, modelName, index, retrieval, answerPrompt } = await prepareRag(options);
       const mode = values["rag.retrievalMode"];
       const historyTurns = values["rag.historyTurns"];
       const result = await evaluateDialogs({
@@ -80,6 +81,7 @@ export function createRagChatHandlers(options: RagAnswerHandlerOptions) {
         index,
         model,
         systemPrompt: systemPrompt(),
+        answerPrompt,
         mode,
         historyTurns,
         ...retrieval,

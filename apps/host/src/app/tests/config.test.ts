@@ -111,7 +111,14 @@ describe("конфигурация", () => {
     expect(cli.sources["rag.retrievalMode"]).toBe("cli");
   });
 
+  it("rag.answerPrompt: по умолчанию default, флаг и значение compact принимаются", () => {
+    expect(resolveConfig({}, {}, root).values["rag.answerPrompt"]).toBe("default");
+    expect(parseOptions(["--rag-answer-prompt=compact"]).flags).toEqual({ "rag.answerPrompt": "compact" });
+    expect(resolveConfig({ "rag.answerPrompt": "compact" }, {}, root).values["rag.answerPrompt"]).toBe("compact");
+  });
+
   it.each([
+    ["rag.answerPrompt", "foo"],
     ["rag.retrievalMode", "hybrid"],
     ["rag.retrievalMode", ""],
     ["rag.candidateTopK", "0"],

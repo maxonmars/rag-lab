@@ -1,5 +1,12 @@
 import { z } from "zod";
-import { MAX_HISTORY_TURNS, MAX_TOP_K, RETRIEVAL_MODES, SIMILARITY_RANGE, STRATEGIES } from "../features/rag/index.ts";
+import {
+  ANSWER_PROMPTS,
+  MAX_HISTORY_TURNS,
+  MAX_TOP_K,
+  RETRIEVAL_MODES,
+  SIMILARITY_RANGE,
+  STRATEGIES,
+} from "../features/rag/index.ts";
 import { sections } from "./markdown.ts";
 
 const descriptions = sections(new URL("./settings.md", import.meta.url));
@@ -26,6 +33,7 @@ export const settings = {
   "rag.embeddingTimeoutMs": { schema: positiveInteger, default: 120000, type: "number" },
   "rag.chunkStrategy": { schema: z.enum(STRATEGIES), default: "structure", type: "string" },
   "rag.retrievalMode": { schema: z.enum(RETRIEVAL_MODES), default: "rewrite-filter", type: "string" },
+  "rag.answerPrompt": { schema: z.enum(ANSWER_PROMPTS), default: "default", type: "string" },
   "rag.candidateTopK": { schema: z.number().int().min(1).max(MAX_TOP_K), default: 10, type: "number" },
   "rag.topK": { schema: z.number().int().min(1).max(MAX_TOP_K), default: 5, type: "number" },
   "rag.similarityThreshold": {

@@ -1,3 +1,4 @@
 # Профиль локальной модели: npm run dev:local. Заменяет lab.config.yaml целиком, остальные настройки — по умолчанию.
+# Модель rag-local-opt создаётся из experiments/feod-local-tuning/Modelfile.
 llm.provider: local
-llm.localModel: rag-local
+llm.localModel: rag-local-opt

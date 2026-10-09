@@ -19,6 +19,7 @@ describe("отчёт rag-eval.md", () => {
     expect(text).toContain("Фактическая длительность прогона:");
     expect(text).toContain("модель эмбеддингов `bge-m3:latest` (digest 790764642607)");
     expect(text).toContain("Модель ответов и переписывания запроса: `deepseek-flash`.");
+    expect(text).toContain("Шаблон ответа: `default` (prompts/answer.md).");
     expect(text).toContain("стратегия structure");
     expect(text).toContain("кандидатов 4, итоговый top-3, порог 0.65");
   });

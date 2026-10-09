@@ -57,6 +57,9 @@
 ## rag.retrievalMode
 Режим поиска в `rag ask` и в режиме `/rag on`: `baseline` — top-K по исходному вопросу; `filter` — то же с порогом сходства; `rewrite` — поиск по переписанному моделью запросу; `rewrite-filter` — переписанный запрос и порог. `rag eval` всегда сравнивает все четыре режима.
 
+## rag.answerPrompt
+Шаблон инструкции ответа: `default` — `prompts/answer.md`; `compact` — `prompts/answer-compact.md`, короче и со строгими правилами цитат, для локальной модели. Действует на `rag ask`, `rag eval`, `rag citations`, `rag dialog` и чат `/rag on`.
+
 ## rag.candidateTopK
 Сколько кандидатов возвращает поиск до отбора, от 1 до 20; не меньше `rag.topK`. Порог отсекает слабый хвост среди кандидатов; при `rag.candidateTopK` больше `rag.topK` итоговая выдача фильтра сама по себе не меняется.
 

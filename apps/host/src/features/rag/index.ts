@@ -1,4 +1,4 @@
-export { answerWithRag, type RagAnswer, type StageTimings } from "./answer.ts";
+export { ANSWER_PROMPTS, type AnswerPrompt, answerWithRag, type RagAnswer, type StageTimings } from "./answer.ts";
 export { type CalibrationOptions, type CalibrationResult, calibrateThreshold } from "./calibration.ts";
 export { type Dialog, type DialogTurn, EMPTY_DIALOG, MAX_HISTORY_TURNS } from "./chat/dialog.ts";
 export {

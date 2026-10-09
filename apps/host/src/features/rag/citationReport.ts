@@ -1,3 +1,4 @@
+import { ANSWER_PROMPT_FILES, type AnswerPrompt } from "./answer.ts";
 import type { CitationFailure, CitationMetrics, CitationResult, StageStats } from "./citationMetrics.ts";
 import { describeCitationProblem, renderCitedAnswer } from "./citationRender.ts";
 import { citationProblems } from "./citations.ts";
@@ -14,6 +15,7 @@ export type CitationReportData = Readonly<{
   params: RetrievalParams;
   questionsFile: string;
   llmModel: string;
+  answerPrompt: AnswerPrompt;
   wallMs: number;
   results: readonly CitationResult[];
   metrics: CitationMetrics;
@@ -27,7 +29,7 @@ function header(data: CitationReportData): string[] {
     "",
     `Прогон ${data.now.toISOString()}. Вопросы: \`${data.questionsFile}\` (${data.results.length}). Фактическая длительность прогона: ${seconds(data.wallMs)} с.`,
     `Индекс создан ${index.createdAt}, модель эмбеддингов \`${index.model.name}\` (digest ${index.model.digest.slice(0, 12)}).`,
-    `Модель ответов и переписывания запроса: \`${data.llmModel}\`. Поиск: стратегия ${data.strategy}, режим ${mode}, кандидатов ${params.candidateTopK}, итоговый top-${params.topK}, порог ${params.threshold} (${threshold}).`,
+    `Модель ответов и переписывания запроса: \`${data.llmModel}\`. Шаблон ответа: \`${data.answerPrompt}\` (prompts/${ANSWER_PROMPT_FILES[data.answerPrompt]}). Поиск: стратегия ${data.strategy}, режим ${mode}, кандидатов ${params.candidateTopK}, итоговый top-${params.topK}, порог ${params.threshold} (${threshold}).`,
     "",
   ];
 }

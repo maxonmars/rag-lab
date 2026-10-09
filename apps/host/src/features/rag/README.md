@@ -20,13 +20,15 @@
 - `openIndex({ indexFile, embeddings })` — читает индекс один раз и проверяет digest модели эмбеддингов; возвращает
   `SearchIndex` с `search(question, strategy, topK)`: эмбеддинг вопроса → косинусная близость по чанкам одной
   стратегии → `SearchHit[]` (`rank` с 1, `score`, чанк без вектора).
-- `answerWithRag({ question, index, strategy, mode, candidateTopK, topK, threshold, model, systemPrompt })` — rewrite
+- `answerWithRag({ question, index, strategy, mode, candidateTopK, topK, threshold, model, systemPrompt, answerPrompt })` — rewrite
   (по режиму) → поиск `candidateTopK` кандидатов → отбор → ответ `Agent`; системная инструкция вызывающего дополняется
-  `prompts/answer.md`. Пустой вопрос — `AgentError EMPTY_INPUT`, несогласованные параметры — `INVALID_RETRIEVAL_PARAMS`,
+  шаблоном ответа `answerPrompt` (`prompts/answer.md` или `answer-compact.md`). Пустой вопрос — `AgentError EMPTY_INPUT`, несогласованные параметры — `INVALID_RETRIEVAL_PARAMS`,
   оба до rewrite и поиска. Возвращает `answer` (`CitedAnswer`), итоговые `hits`, `contextChars`, фактическую строку поиска
   `query`, исходные `candidates` и длительности этапов `timings` (`rewriteMs`, `searchMs`, `selectMs`, `generateMs`).
 - `renderCitedAnswer(answer)`, `describeCitationProblem(problem)` — единственный текст ответа для CLI и отчётов и русские
   описания замечаний к контракту.
+- `ANSWER_PROMPTS` (`default`, `compact`), `AnswerPrompt` — шаблоны инструкции ответа (ADR 0008); `answerPrompt` обязателен в опциях
+  `answerWithRag`, `evaluateQuestions`, `evaluateCitations`, `chatTurn`, `evaluateDialogs`, шапки отчётов называют шаблон.
 - `RETRIEVAL_MODES` (`baseline`, `filter`, `rewrite`, `rewrite-filter`), `RetrievalMode`, `checkRetrievalParams(params)`,
   `MAX_TOP_K`, `SIMILARITY_RANGE`, `usesFilter(mode)` — единый набор режимов и единственная проверка параметров.
 - `calibrateThreshold(options)` — один поиск исходной формулировкой на вопрос, сетка порогов, `rag-calibration.md`;
@@ -100,7 +102,7 @@ threshold-фильтра. Параметры проверяются до вне�
 
 ## Сообщение в режиме RAG
 
-Пользовательское сообщение собирает `renderRagMessage` как Markdown; инструкции модели в нём нет, они в `prompts/answer.md`:
+Пользовательское сообщение собирает `renderRagMessage` как Markdown; инструкции модели в нём нет, они в `prompts/answer.md` (или `answer-compact.md`):
 
 ````text
 ## Фрагменты документации
@@ -125,7 +127,7 @@ threshold-фильтра. Параметры проверяются до вне�
 
 ## Формат ответа и проверка цитат
 
-Инструкция `prompts/answer.md` требует Markdown-разделы: `## Ответ`, `## Источники`, `## Цитаты` либо, если во
+Инструкции `prompts/answer.md` и `answer-compact.md` требуют Markdown-разделы: `## Ответ`, `## Источники`, `## Цитаты` либо, если во
 фрагментах нет сведений, `## Не знаю` и `## Уточнение`. Источник — строка `- [N]`, цитата — `- [N] «текст»`, где `N` — номер
 из заголовка «Фрагмент N», то есть `rank` чанка. `parseCitedAnswer` разбирает ответ и возвращает `CitedAnswer`:
 
@@ -169,7 +171,7 @@ rewrite, поиска, генерации и всех этапов), табли�
 `## Уточнение`, при отказе по отбору — фиксированная фраза. Номера относятся к фрагментам своего хода, поэтому источник дополнен
 файлом. Rewrite получает память и две последние реплики текстом и берёт из памяти только то, на что ссылается вопрос.
 
-**Сообщение ответа.** Системная инструкция вызывающего + `answer.md` + `chat.md`; сообщение пользователя —
+**Сообщение ответа.** Системная инструкция вызывающего + шаблон ответа (`answer.md` или `answer-compact.md`) + `chat.md`; сообщение пользователя —
 `## Память задачи` (разделы памяти понижены до `###`), `## Фрагменты документации`, `## Вопрос`. Память и история не источник
 фактов: источники и цитаты берутся из фрагментов текущего сообщения, формат ответа и проверка цитат прежние (ADR 0005).
 

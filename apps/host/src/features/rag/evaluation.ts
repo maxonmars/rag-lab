@@ -1,5 +1,5 @@
 import type { ModelPort } from "../../core/index.ts";
-import { generateAnswer } from "./answer.ts";
+import { type AnswerPrompt, generateAnswer } from "./answer.ts";
 import { writeFileAtomic } from "./atomicWrite.ts";
 import { allModeMetrics, type ModeMetrics, type ModeOutcome, type QuestionResult } from "./evalMetrics.ts";
 import { renderEvalReport } from "./evalReport.ts";
@@ -22,6 +22,7 @@ export type EvalOptions = RetrievalParams &
     strategy: Strategy;
     model: ModelPort;
     systemPrompt: string;
+    answerPrompt: AnswerPrompt;
     /** Значения только для шапки отчёта. */
     meta: Readonly<{ questionsFile: string; llmModel: string }>;
     onProgress?: (event: EvalProgress) => void;
@@ -55,6 +56,7 @@ async function answerMode(
     generateAnswer({
       model: options.model,
       systemPrompt: options.systemPrompt,
+      answerPrompt: options.answerPrompt,
       question: question.question,
       selection: selection.value,
       threshold: usesFilter(mode) ? options.threshold : null,
@@ -113,6 +115,7 @@ export async function evaluateQuestions(options: EvalOptions): Promise<EvalResul
       params: options,
       questionsFile: options.meta.questionsFile,
       llmModel: options.meta.llmModel,
+      answerPrompt: options.answerPrompt,
       wallMs,
       results,
       metrics,
