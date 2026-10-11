@@ -9,6 +9,7 @@ import { type CreateModel, type ModelOptions, modelLabel } from "./model.ts";
 import { createRagHandlers } from "./rag.ts";
 import { createRagAnswerHandlers, modeLines } from "./ragAnswer.ts";
 import { createRagChatHandlers, stateLines } from "./ragChat.ts";
+import { createRagServeHandler } from "./ragServe.ts";
 
 export type RunOptions = Readonly<{
   argv: readonly string[];
@@ -17,6 +18,8 @@ export type RunOptions = Readonly<{
   terminal: Terminal;
   createModel?: CreateModel;
   createEmbeddings?: CreateEmbeddings;
+  /** Завершается по сигналу остановки процесса; без неё `rag serve` работает до завершения процесса. */
+  waitForStop?: () => Promise<void>;
 }>;
 
 function defaultCreateModel(options: ModelOptions) {
@@ -29,9 +32,11 @@ export async function run(options: RunOptions): Promise<number> {
   const getConfig = () => config;
   const createModel = options.createModel ?? defaultCreateModel;
   const { cwd, createEmbeddings } = options;
+  const waitForStop = options.waitForStop ?? (() => new Promise<void>(() => {}));
   const rag = createRagHandlers({ cwd, getConfig, view, createEmbeddings });
   const ragAnswer = createRagAnswerHandlers({ cwd, getConfig, createModel, createEmbeddings, view });
   const ragChat = createRagChatHandlers({ cwd, getConfig, createModel, createEmbeddings, view });
+  const ragServe = createRagServeHandler({ cwd, getConfig, createModel, createEmbeddings, view, waitForStop });
   let ragMode = false;
   let dialog: Dialog = EMPTY_DIALOG;
   const commands = createCommands({
@@ -60,6 +65,7 @@ export async function run(options: RunOptions): Promise<number> {
     ragEval: ragAnswer.evaluate,
     ragCitations: ragAnswer.citations,
     ragDialog: ragChat.dialogs,
+    ragServe,
     view,
   });
   let command: string[];

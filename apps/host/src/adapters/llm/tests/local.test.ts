@@ -28,6 +28,17 @@ describe("локальный адаптер", () => {
     });
   });
 
+  it("с apiKey шлёт Authorization: Bearer <ключ>, без apiKey — заглушку local", async () => {
+    const fetch = vi.fn<typeof globalThis.fetch>().mockImplementation(async () => {
+      const body = { choices: [{ message: { role: "assistant", content: "Привет" }, finish_reason: "stop" }] };
+      return new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
+    });
+    await new LocalModel({ ...options, apiKey: "gateway-key", fetch }).complete(request);
+    await new LocalModel({ ...options, fetch }).complete(request);
+    const authorization = fetch.mock.calls.map(([, init]) => new Headers(init?.headers).get("authorization"));
+    expect(authorization).toEqual(["Bearer gateway-key", "Bearer local"]);
+  });
+
   it("недоступный сервер даёт MODEL_FAILURE без повтора", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockRejectedValue(new Error("ECONNREFUSED"));
     await expect(new LocalModel({ ...options, fetch }).complete(request)).rejects.toMatchObject({

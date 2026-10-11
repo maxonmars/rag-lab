@@ -17,6 +17,7 @@ YAML содержит плоские ключи с точками. Секрет�
 | llm.localModel | string | qwen3 | LAB_LLM_LOCAL_MODEL | --llm-local-model | Имя локальной модели на сервере, например из `ollama list`. |
 | llm.localTimeoutMs | number | 180000 | LAB_LLM_LOCAL_TIMEOUT_MS | --llm-local-timeout-ms | Таймаут одного запроса к локальной модели, миллисекунды; локальный вывод заметно медленнее облачного. |
 | llm.apiKey | string | — | LAB_LLM_API_KEY | — | Ключ DeepSeek; принимается только из env, значение никогда не выводится. |
+| llm.localApiKey | string | — | LAB_LLM_LOCAL_API_KEY | — | Ключ шлюза локальной модели (`servers/llm-gateway`), отправляется как Bearer при `llm.provider: local`; принимается только из env, значение не выводится. Без него отправляется заглушка — Ollama ключ не проверяет. |
 | rag.inputDir | string | .local/rag/corpus | LAB_RAG_INPUT_DIR | --rag-input-dir | Каталог Markdown-корпуса относительно текущего рабочего каталога; готовится командой `npm run corpus:feod`. |
 | rag.outputDir | string | .local/rag | LAB_RAG_OUTPUT_DIR | --rag-output-dir | Каталог результатов относительно текущего рабочего каталога: `index.json`, `comparison.md`, `rag-calibration.md` и `rag-eval.md`. |
 | rag.chunkSizeChars | number | 1800 | LAB_RAG_CHUNK_SIZE_CHARS | --rag-chunk-size-chars | Максимальный размер чанка и окна fixed в кодовых точках Unicode. |
@@ -34,3 +35,7 @@ YAML содержит плоские ключи с точками. Секрет�
 | rag.questionsFile | string | experiments/feod-retrieval/questions.md | LAB_RAG_QUESTIONS_FILE | --rag-questions-file | Markdown-файл контрольных вопросов для `rag calibrate` и `rag eval` относительно текущего рабочего каталога. |
 | rag.historyTurns | number | 6 | LAB_RAG_HISTORY_TURNS | --rag-history-turns | Окно истории RAG-чата: сколько последних ходов (пар «вопрос — ответ») передаётся модели настоящими сообщениями, от 1 до 20. Действует в режиме `/rag on` и в `rag dialog`; `rag ask` истории не использует. |
 | rag.dialogFile | string | experiments/feod-chat/scenarios.md | LAB_RAG_DIALOG_FILE | --rag-dialog-file | Markdown-файл сценариев диалога для `rag dialog` относительно текущего рабочего каталога. |
+| service.host | string | 127.0.0.1 | LAB_SERVICE_HOST | --service-host | Адрес, на котором `rag serve` слушает HTTP. По умолчанию `127.0.0.1`: наружу сервис открывает шлюз `servers/llm-gateway`, ключа у `rag serve` нет. |
+| service.port | number | 8788 | LAB_SERVICE_PORT | --service-port | Порт `rag serve`, от 1 до 65535. Шлюз ходит на него по `GATEWAY_RAG_URL`. |
+| service.maxSessions | number | 20 | LAB_SERVICE_MAX_SESSIONS | --service-max-sessions | Сколько сессий диалога `rag serve` держит в памяти. При переполнении вытесняется давно не использованная сессия без текущего хода; если заняты все — 503 `too_many_sessions`. |
+| service.sessionIdleMs | number | 1800000 | LAB_SERVICE_SESSION_IDLE_MS | --service-session-idle-ms | Через сколько миллисекунд простоя сессия `rag serve` удаляется вместе с историей и памятью задачи. |

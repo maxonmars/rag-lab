@@ -54,6 +54,7 @@ ollama serve > /tmp/ollama.log 2>&1 &
 ## Модели и память
 
 - После запроса модель остаётся в памяти 5 минут (`OLLAMA_KEEP_ALIVE`). Выгрузить сразу: `ollama stop bge-m3`.
+  Для режима сервиса (шлюз `servers/llm-gateway`) сервер запускают как `OLLAMA_KEEP_ALIVE=30m ollama serve`: иначе первый запрос после простоя заново грузит 18 ГБ.
 - Скачать: `ollama pull bge-m3` (нужно один раз). Удалить: `ollama rm bge-m3` — освободит около 1,2 ГБ.
 - Удалить Ollama целиком: `brew uninstall --cask ollama`. Каталог `~/.ollama` (модели и ключ `id_ed25519`)
   остаётся; удалять его или нет — решает владелец, ключ в git не попадает.

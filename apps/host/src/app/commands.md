@@ -39,6 +39,9 @@
 ## rag dialog
 Прогнать сценарии rag.dialogFile (каждый в новом пустом диалоге) в режиме rag.retrievalMode и окне rag.historyTurns и записать отчёт rag-dialog.md: источники и цитаты по ходам, сохранение цели и ключей памяти. Нужны индекс, запущенная Ollama и LAB_LLM_API_KEY; первая ошибка прерывает прогон, прежний отчёт остаётся.
 
+## rag serve
+Запустить HTTP-сервер RAG-чата на service.host:service.port (по умолчанию 127.0.0.1:8788) без ключа: `POST /v1/rag/chat` с `{"question", "session_id"?}` отвечает ответом с источниками, цитатами и памятью задачи, `DELETE /v1/rag/sessions/{id}` сбрасывает сессию. Диалоги хранятся в памяти процесса: не больше service.maxSessions, простой до service.sessionIdleMs. Наружу сервис открывает шлюз llm-gateway. Команда занимает процесс до Ctrl+C или SIGTERM, поэтому запускайте её из CLI, а не из REPL. Нужны индекс, запущенная Ollama и модель по llm.provider; без индекса команда завершается до запуска сервера.
+
 ## rag citations
 Прогнать контрольные вопросы rag.questionsFile в режиме rag.retrievalMode и записать отчёт rag-citations.md: источники (chunk_id, source), проверка цитат на дословность, ответы «не знаю». Нужны индекс и запущенная Ollama; LAB_LLM_API_KEY — только при llm.provider: deepseek. Ошибка модели записывается как исход вопроса и не прерывает прогон.
 

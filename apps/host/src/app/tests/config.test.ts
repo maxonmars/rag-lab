@@ -57,6 +57,21 @@ describe("конфигурация", () => {
     expect(() => resolveConfig({}, {}, root)).toThrow(/недоступная настройка/);
   });
 
+  it("llm.localApiKey: показывает только [задано]/[не задано], не принимает из файла и CLI", () => {
+    const config = resolveConfig({}, { LAB_LLM_LOCAL_API_KEY: "gateway-secret" }, root);
+    const rows = showConfig(config);
+    expect(rows).toContainEqual({ key: "llm.localApiKey", value: "[задано]", source: "env" });
+    expect(JSON.stringify(rows)).not.toContain("gateway-secret");
+    expect(showConfig(resolveConfig({}, {}, root))).toContainEqual({
+      key: "llm.localApiKey",
+      value: "[не задано]",
+      source: "default",
+    });
+    expect(() => parseOptions(["--llm-local-api-key", "gateway-secret"])).toThrow();
+    writeFileSync(join(root, "lab.config.yaml"), "llm.localApiKey: gateway-secret");
+    expect(() => resolveConfig({}, {}, root)).toThrow(/недоступная настройка/);
+  });
+
   it("отклоняет некорректный источник даже при наличии переопределения", () => {
     writeFileSync(join(root, "lab.config.yaml"), "llm.timeoutMs: -1");
     expect(() => resolveConfig({ "llm.timeoutMs": "20" }, {}, root)).toThrow(/источник: file/);
@@ -109,6 +124,21 @@ describe("конфигурация", () => {
       cli.values["rag.similarityThreshold"],
     ]).toEqual(["rewrite", 6, 0.7]);
     expect(cli.sources["rag.retrievalMode"]).toBe("cli");
+  });
+
+  it("service.*: defaults, env переопределяет значение по умолчанию, порт вне диапазона отклоняется", () => {
+    const defaults = resolveConfig({}, {}, root).values;
+    expect([
+      defaults["service.host"],
+      defaults["service.port"],
+      defaults["service.maxSessions"],
+      defaults["service.sessionIdleMs"],
+    ]).toEqual(["127.0.0.1", 8788, 20, 1800000]);
+    const fromEnv = resolveConfig({}, { LAB_SERVICE_PORT: "9100", LAB_SERVICE_MAX_SESSIONS: "3" }, root);
+    expect([fromEnv.values["service.port"], fromEnv.values["service.maxSessions"]]).toEqual([9100, 3]);
+    expect(fromEnv.sources["service.port"]).toBe("env");
+    expect(resolveConfig({ "service.sessionIdleMs": "500" }, {}, root).values["service.sessionIdleMs"]).toBe(500);
+    expect(() => resolveConfig({}, { LAB_SERVICE_PORT: "70000" }, root)).toThrow(/service.port/);
   });
 
   it("rag.answerPrompt: по умолчанию default, флаг и значение compact принимаются", () => {

@@ -19,6 +19,7 @@ export type CommandView = Pick<
   | "taskState"
   | "ragMode"
   | "evalSaved"
+  | "serving"
 >;
 
 const fallbackWidth = 88;
@@ -122,6 +123,11 @@ export class CliView {
 
   evalSaved(lines: readonly string[], path: string): void {
     this.#block("Контрольные вопросы", [...lines, "", this.#paint("muted", `Сохранено: ${path}`)]);
+  }
+
+  /** Стартовое сообщение `rag serve`: адрес, модель, параметры поиска и лимиты сессий. */
+  serving(lines: readonly string[]): void {
+    this.#block("RAG-сервис", lines);
   }
 
   /** Служебная строка хода длинной операции; пишется в stderr, чтобы не смешиваться с результатом. */

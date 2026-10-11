@@ -2,7 +2,7 @@
 
 ## Текущее приложение
 
-Исполняемый workspace `apps/host`. Общих библиотек и серверов нет. `app/main.ts` принимает окружение, argv и потоки;
+Исполняемый workspace `apps/host`; рядом отдельный процесс `servers/llm-gateway` (раздел «Шлюз локальной модели»). Общих библиотек нет. `app/main.ts` принимает окружение, argv и потоки;
 `app/compose.ts` собирает приложение. Модель (DeepSeek или локальная по `llm.provider`) создаётся лениво при первом `ask`, `rag ask`, `rag eval`, `rag citations` или `rag dialog`, поэтому
 справка, настройки, `rag index`, `rag compare` и `rag calibrate` работают без ключа.
 
@@ -10,6 +10,7 @@
 flowchart LR
     App[app: композиция] --> Core[core: Agent и ModelPort]
     App --> CLI[adapters/cli]
+    App --> Http[adapters/http]
     App --> LLM[adapters/llm]
     App --> Rag[features/rag]
     CLI --> Core
@@ -92,7 +93,7 @@ App создаёт новый `SearchIndex` на каждый `rag ask` (све�
 Режим `/rag on` превращает реплики REPL в чат: `ask` и обычная строка вызывают `chatTurn` (`features/rag/chat/`), `rag ask`
 остаётся одиночным. Источник истины — локальная переменная `dialog` в `run()` (`app/compose.ts`) рядом с `ragMode`: неизменяемый
 `Dialog` с памятью задачи и ходами. `app/ragChat.ts` вызывает `chatTurn`, а `compose.ts` присваивает возвращённый диалог только
-после успешного хода; ошибка оставляет прежний. Файлов сессий нет, диалог живёт до выхода из REPL; `/rag off` его не сбрасывает,
+после успешного хода; ошибка оставляет прежний. Файлов сессий нет, диалог живёт до выхода из REPL (в `rag serve` — в `Map` процесса сервера); `/rag off` его не сбрасывает,
 `/rag reset` сбрасывает. `chatTurn` не хранит состояния и выполняет шаги в фиксированном порядке:
 
 1. Проверка параметров поиска и `rag.historyTurns`; пустой вопрос — `AgentError EMPTY_INPUT`.
@@ -110,13 +111,45 @@ App создаёт новый `SearchIndex` на каждый `rag ask` (све�
 пустом `Dialog`, и пишет `rag-dialog.md` один раз после успеха: сводка (источники, цитаты, «не знаю», сохранение цели и ключей
 памяти), таблица ходов, фрагменты, ответ и память после каждого хода. Решение — [ADR 0006](docs/adr/0006-rag-chat-memory.md).
 
+## Шлюз локальной модели
+
+`servers/llm-gateway` (ADR 0009) — отдельный процесс на `node:http` со своим composition root: `app/main.ts` читает `GATEWAY_*`,
+`app/compose.ts` связывает модули `auth`, `rateLimit`, `request`, `concurrency` и `proxy`. Зависимостей времени выполнения и импортов
+из `apps/` нет; граница проверяется `check:deps` (`servers-are-independent`, `no-host-server-imports`).
+
+```mermaid
+flowchart LR
+    Client[rag-lab LocalModel или curl] -->|"HTTP, Bearer-ключ"| Gateway[llm-gateway :8787]
+    Gateway -->|"/v1/chat/completions"| Ollama[Ollama 127.0.0.1:11434]
+    Rag[features/rag] -->|"/api/embed напрямую"| Ollama
+```
+
+Шлюз проверяет ключ, rate limit по ключу, размер тела, поля запроса и входной контекст в символах, затем занимает слот семафора
+(очередь ограничена) и пересылает запрос в Ollama. Ответ Ollama отдаётся без разбора. Host знает о шлюзе только по `llm.localBaseUrl`
+и секрету `llm.localApiKey`; эмбеддинги в шлюз не ходят.
+
+## RAG-сервис
+
+`rag serve` (ADR 0010) — HTTP-сервер host на `127.0.0.1:8788` без ключа. Транспорт — `adapters/http` (без знания о RAG), хранилище
+сессий `app/ragSessions.ts` и обработчики `app/ragService.ts` вызывают публичный `chatTurn`; диалоги лежат в `Map` процесса
+и теряются при перезапуске. Наружу сервис открывает шлюз: маршруты `POST /v1/rag/chat` и `DELETE /v1/rag/sessions/{id}`
+проходят те же ключ и rate limit, но очередь у RAG отдельная.
+
+```mermaid
+flowchart LR
+    Client[Второй Mac, curl] -->|"HTTP, Bearer-ключ"| Gateway[llm-gateway :8787]
+    Gateway -->|"/v1/rag/*"| Serve[rag serve 127.0.0.1:8788]
+    Serve --> Ollama[Ollama: эмбеддинги и модель]
+    Serve --> Index[(.local/rag/index.json)]
+```
+
 ## Границы и рост
 
 Разрешённые импорты: app → core/adapters/features; adapters → core и публичные порты features; features → core.
 Внешний вход фичи — index.ts. Фичи не импортируют друг друга даже через публичные входы.
 Каждая фича содержит README, собственные тесты и, при необходимости, prompts/*.md.
 Тесты внутри фичи могут обращаться к её внутренним файлам; тесты app — только к публичному входу.
-При появлении нового процесса у него собственный composition root.
+При появлении нового процесса у него собственный composition root (так устроен `servers/llm-gateway`).
 
 Сейчас в core есть ModelPort и ToolSource. ContextStep, TraceSink и контракты хранилищ заранее не объявляются:
 когда задание потребует новый контракт, сначала принимается ADR с конкретным потребителем и проверяемой границей.

@@ -17,12 +17,12 @@ MCP-серверы; для RAG пришлось бы переписывать и
 
 ## Решение
 
-- Новый репозиторий rag-lab, раскладка npm workspaces `apps/host`; каталога `servers/` нет.
+- Новый репозиторий rag-lab, раскладка npm workspaces `apps/host`; каталога `servers/` не было (с ADR 0009 — `servers/llm-gateway`).
 - Из mcp-lab перенесены tooling, конфигурации Biome, TypeScript и Vitest, pre-commit и CI, ядро (Agent, ModelPort,
   ToolSource, AgentError), адаптер DeepSeek, CLI-адаптер, реестры настроек и команд, `ask` без инструментов.
 - Не перенесены MCP-фичи, серверы MCP, зависимости `@modelcontextprotocol/*`, worker планировщика и связанные тесты.
 - Ядро осталось без изменений: ToolSource нейтрален и пригодится позже, `ask` сейчас отвечает без инструментов.
-- Правила границ tooling остались общими; правила про `servers/` не срабатывают, пока каталога нет.
+- Правила границ tooling остались общими; правила про `servers/` срабатывают с появлением каталога (ADR 0009).
 - Первая содержательная фича — `features/rag` (ADR 0002).
 
 ## Последствия

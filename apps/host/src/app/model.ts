@@ -33,6 +33,7 @@ export function createConfiguredModel(config: ResolvedConfig, createModel: Creat
       model: values["llm.localModel"],
       timeoutMs: values["llm.localTimeoutMs"],
       maxOutputTokens: values["llm.maxOutputTokens"],
+      ...(values["llm.localApiKey"] ? { apiKey: values["llm.localApiKey"] } : {}),
     });
   }
   return createModel({

@@ -1,0 +1,10 @@
+{
+  "model": "rag-local-opt",
+  "messages": [
+    { "role": "user", "content": "Назови столицу Франции одним словом." },
+    { "role": "assistant", "content": "Париж." },
+    { "role": "user", "content": "А сколько примерно человек там живёт? Ответь одним предложением." }
+  ],
+  "max_tokens": 96,
+  "reasoning_effort": "none"
+}
