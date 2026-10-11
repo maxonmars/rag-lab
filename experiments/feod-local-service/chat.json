@@ -1,0 +1,6 @@
+{
+  "model": "rag-local-opt",
+  "messages": [{ "role": "user", "content": "Назови столицу Франции одним словом." }],
+  "max_tokens": 64,
+  "reasoning_effort": "none"
+}

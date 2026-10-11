@@ -17,6 +17,7 @@ YAML содержит плоские ключи с точками. Секрет�
 | llm.localModel | string | qwen3 | LAB_LLM_LOCAL_MODEL | --llm-local-model | Имя локальной модели на сервере, например из `ollama list`. |
 | llm.localTimeoutMs | number | 180000 | LAB_LLM_LOCAL_TIMEOUT_MS | --llm-local-timeout-ms | Таймаут одного запроса к локальной модели, миллисекунды; локальный вывод заметно медленнее облачного. |
 | llm.apiKey | string | — | LAB_LLM_API_KEY | — | Ключ DeepSeek; принимается только из env, значение никогда не выводится. |
+| llm.localApiKey | string | — | LAB_LLM_LOCAL_API_KEY | — | Ключ шлюза локальной модели (`servers/llm-gateway`), отправляется как Bearer при `llm.provider: local`; принимается только из env, значение не выводится. Без него отправляется заглушка — Ollama ключ не проверяет. |
 | rag.inputDir | string | .local/rag/corpus | LAB_RAG_INPUT_DIR | --rag-input-dir | Каталог Markdown-корпуса относительно текущего рабочего каталога; готовится командой `npm run corpus:feod`. |
 | rag.outputDir | string | .local/rag | LAB_RAG_OUTPUT_DIR | --rag-output-dir | Каталог результатов относительно текущего рабочего каталога: `index.json`, `comparison.md`, `rag-calibration.md` и `rag-eval.md`. |
 | rag.chunkSizeChars | number | 1800 | LAB_RAG_CHUNK_SIZE_CHARS | --rag-chunk-size-chars | Максимальный размер чанка и окна fixed в кодовых точках Unicode. |

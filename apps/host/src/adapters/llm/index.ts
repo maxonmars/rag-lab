@@ -13,6 +13,7 @@ export type LocalModelOptions = Readonly<{
   model: string;
   timeoutMs: number;
   maxOutputTokens: number;
+  apiKey?: string;
   fetch?: typeof globalThis.fetch;
 }>;
 
@@ -22,9 +23,9 @@ export class DeepSeekModel extends ChatCompletionsModel {
   }
 }
 
-/** Локальный OpenAI-совместимый сервер (Ollama, LM Studio, mlx_lm.server); ключ не проверяется, SDK требует непустой. */
+/** Локальный OpenAI-совместимый сервер (Ollama, LM Studio, mlx_lm.server, llm-gateway); без ключа SDK получает заглушку. */
 export class LocalModel extends ChatCompletionsModel {
   constructor(options: LocalModelOptions) {
-    super({ ...options, apiKey: "local", extraBody: { reasoning_effort: "none" } });
+    super({ ...options, apiKey: options.apiKey ?? "local", extraBody: { reasoning_effort: "none" } });
   }
 }

@@ -57,6 +57,21 @@ describe("конфигурация", () => {
     expect(() => resolveConfig({}, {}, root)).toThrow(/недоступная настройка/);
   });
 
+  it("llm.localApiKey: показывает только [задано]/[не задано], не принимает из файла и CLI", () => {
+    const config = resolveConfig({}, { LAB_LLM_LOCAL_API_KEY: "gateway-secret" }, root);
+    const rows = showConfig(config);
+    expect(rows).toContainEqual({ key: "llm.localApiKey", value: "[задано]", source: "env" });
+    expect(JSON.stringify(rows)).not.toContain("gateway-secret");
+    expect(showConfig(resolveConfig({}, {}, root))).toContainEqual({
+      key: "llm.localApiKey",
+      value: "[не задано]",
+      source: "default",
+    });
+    expect(() => parseOptions(["--llm-local-api-key", "gateway-secret"])).toThrow();
+    writeFileSync(join(root, "lab.config.yaml"), "llm.localApiKey: gateway-secret");
+    expect(() => resolveConfig({}, {}, root)).toThrow(/недоступная настройка/);
+  });
+
   it("отклоняет некорректный источник даже при наличии переопределения", () => {
     writeFileSync(join(root, "lab.config.yaml"), "llm.timeoutMs: -1");
     expect(() => resolveConfig({ "llm.timeoutMs": "20" }, {}, root)).toThrow(/источник: file/);

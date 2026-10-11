@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "workspaces": [
-    "apps/*"
+    "apps/*",
+    "servers/*"
   ],
   "engines": {
     "node": "24.x"
@@ -13,6 +14,7 @@
     "dev": "npm run dev --workspace @rag-lab/host --",
     "dev:local": "npm run dev -- --config-file lab.local.yaml",
     "start": "npm run start --workspace @rag-lab/host --",
+    "gateway": "npm run dev --workspace @rag-lab/llm-gateway",
     "build": "node tooling/build.ts",
     "typecheck": "tsc --noEmit",
     "lint": "biome check .",

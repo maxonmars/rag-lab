@@ -23,6 +23,7 @@ export const settings = {
   "llm.localModel": { schema: z.string().trim().min(1), default: "qwen3", type: "string" },
   "llm.localTimeoutMs": { schema: positiveInteger, default: 180000, type: "number" },
   "llm.apiKey": { schema: z.string().trim().min(1).nullable(), default: null, type: "string", secret: true },
+  "llm.localApiKey": { schema: z.string().trim().min(1).nullable(), default: null, type: "string", secret: true },
   "rag.inputDir": { schema: z.string().trim().min(1), default: ".local/rag/corpus", type: "string" },
   "rag.outputDir": { schema: z.string().trim().min(1), default: ".local/rag", type: "string" },
   "rag.chunkSizeChars": { schema: positiveInteger, default: 1800, type: "number" },

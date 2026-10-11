@@ -59,6 +59,15 @@ describe("CLI и REPL", () => {
     expect(result.output).toContain("── Ответ агента · local · qwen3 ──");
   });
 
+  it("LAB_LLM_LOCAL_API_KEY уходит в локальную модель как apiKey", async () => {
+    const env = { LAB_LLM_LOCAL_API_KEY: "gateway-key" };
+    const result = await invoke(["--llm-provider", "local", "ask", "Тест"], { cwd, authenticated: false, env });
+    expect(result.code).toBe(0);
+    expect(result.createModel).toHaveBeenCalledWith(
+      expect.objectContaining({ provider: "local", apiKey: "gateway-key" }),
+    );
+  });
+
   it("--llm-local-model меняет подпись модели в ответе", async () => {
     const argv = ["--llm-provider", "local", "--llm-local-model", "qwen3.8:27b-mlx", "ask", "Тест"];
     const result = await invoke(argv, { cwd, authenticated: false });
