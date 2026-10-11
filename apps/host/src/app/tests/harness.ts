@@ -18,6 +18,8 @@ export type InvokeOptions = Readonly<{
   embeddings?: EmbeddingPort;
   /** Дополнительные переменные окружения процесса; ключ DeepSeek задаётся `authenticated`. */
   env?: Readonly<Record<string, string>>;
+  /** Для `rag serve`: сервер работает, пока промис не завершится. */
+  waitForStop?: () => Promise<void>;
 }>;
 
 const echo = (request: ModelRequest): Promise<ModelCompletion> =>
@@ -48,6 +50,7 @@ export async function invoke(argv: string[], options: InvokeOptions) {
     env: { ...(options.authenticated === false ? {} : { LAB_LLM_API_KEY: "test-key" }), ...options.env },
     createModel,
     createEmbeddings,
+    ...(options.waitForStop ? { waitForStop: options.waitForStop } : {}),
     terminal: {
       input: Readable.from([options.input ?? ""]),
       interactive: options.interactive ?? false,

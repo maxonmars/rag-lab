@@ -13,6 +13,8 @@ export const baseConfig: GatewayConfig = {
   upstreamUrl: "http://upstream.test/v1",
   model: "rag-local-opt",
   upstreamTimeoutMs: 2000,
+  ragUrl: "http://rag.test",
+  ragTimeoutMs: 2000,
   rateLimitPerMinute: 20,
   maxConcurrent: 1,
   maxQueue: 4,

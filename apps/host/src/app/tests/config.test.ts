@@ -126,6 +126,21 @@ describe("конфигурация", () => {
     expect(cli.sources["rag.retrievalMode"]).toBe("cli");
   });
 
+  it("service.*: defaults, env переопределяет значение по умолчанию, порт вне диапазона отклоняется", () => {
+    const defaults = resolveConfig({}, {}, root).values;
+    expect([
+      defaults["service.host"],
+      defaults["service.port"],
+      defaults["service.maxSessions"],
+      defaults["service.sessionIdleMs"],
+    ]).toEqual(["127.0.0.1", 8788, 20, 1800000]);
+    const fromEnv = resolveConfig({}, { LAB_SERVICE_PORT: "9100", LAB_SERVICE_MAX_SESSIONS: "3" }, root);
+    expect([fromEnv.values["service.port"], fromEnv.values["service.maxSessions"]]).toEqual([9100, 3]);
+    expect(fromEnv.sources["service.port"]).toBe("env");
+    expect(resolveConfig({ "service.sessionIdleMs": "500" }, {}, root).values["service.sessionIdleMs"]).toBe(500);
+    expect(() => resolveConfig({}, { LAB_SERVICE_PORT: "70000" }, root)).toThrow(/service.port/);
+  });
+
   it("rag.answerPrompt: по умолчанию default, флаг и значение compact принимаются", () => {
     expect(resolveConfig({}, {}, root).values["rag.answerPrompt"]).toBe("default");
     expect(parseOptions(["--rag-answer-prompt=compact"]).flags).toEqual({ "rag.answerPrompt": "compact" });

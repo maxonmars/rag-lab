@@ -15,6 +15,7 @@ const silentView = {
   taskState: () => {},
   ragMode: () => {},
   evalSaved: () => {},
+  serving: () => {},
 };
 
 /** Реестр с заглушками обработчиков: нужны только имена, аргументы и описания команд. */
@@ -35,6 +36,7 @@ function stubRegistry() {
     ragEval: async () => ({ lines: [], path: "" }),
     ragCitations: async () => ({ lines: [], path: "" }),
     ragDialog: async () => ({ lines: [], path: "" }),
+    ragServe: async () => {},
     view: silentView,
   });
 }

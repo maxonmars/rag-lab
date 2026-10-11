@@ -23,6 +23,7 @@ type CommandContext = {
   ragEval: () => Promise<RagOutcome>;
   ragCitations: () => Promise<RagOutcome>;
   ragDialog: () => Promise<RagOutcome>;
+  ragServe: () => Promise<void>;
   view: CommandView;
 };
 
@@ -113,6 +114,15 @@ function ragChatCommands(context: CommandContext): Command[] {
       run: async () => {
         const outcome = await context.ragDialog();
         context.view.evalSaved(outcome.lines, outcome.path);
+        return "continue";
+      },
+    },
+    {
+      name: "rag serve",
+      arguments: [],
+      description: descriptions["rag serve"] ?? "",
+      run: async () => {
+        await context.ragServe();
         return "continue";
       },
     },

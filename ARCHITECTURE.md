@@ -10,6 +10,7 @@
 flowchart LR
     App[app: композиция] --> Core[core: Agent и ModelPort]
     App --> CLI[adapters/cli]
+    App --> Http[adapters/http]
     App --> LLM[adapters/llm]
     App --> Rag[features/rag]
     CLI --> Core
@@ -92,7 +93,7 @@ App создаёт новый `SearchIndex` на каждый `rag ask` (све�
 Режим `/rag on` превращает реплики REPL в чат: `ask` и обычная строка вызывают `chatTurn` (`features/rag/chat/`), `rag ask`
 остаётся одиночным. Источник истины — локальная переменная `dialog` в `run()` (`app/compose.ts`) рядом с `ragMode`: неизменяемый
 `Dialog` с памятью задачи и ходами. `app/ragChat.ts` вызывает `chatTurn`, а `compose.ts` присваивает возвращённый диалог только
-после успешного хода; ошибка оставляет прежний. Файлов сессий нет, диалог живёт до выхода из REPL; `/rag off` его не сбрасывает,
+после успешного хода; ошибка оставляет прежний. Файлов сессий нет, диалог живёт до выхода из REPL (в `rag serve` — в `Map` процесса сервера); `/rag off` его не сбрасывает,
 `/rag reset` сбрасывает. `chatTurn` не хранит состояния и выполняет шаги в фиксированном порядке:
 
 1. Проверка параметров поиска и `rag.historyTurns`; пустой вопрос — `AgentError EMPTY_INPUT`.
@@ -126,6 +127,21 @@ flowchart LR
 Шлюз проверяет ключ, rate limit по ключу, размер тела, поля запроса и входной контекст в символах, затем занимает слот семафора
 (очередь ограничена) и пересылает запрос в Ollama. Ответ Ollama отдаётся без разбора. Host знает о шлюзе только по `llm.localBaseUrl`
 и секрету `llm.localApiKey`; эмбеддинги в шлюз не ходят.
+
+## RAG-сервис
+
+`rag serve` (ADR 0010) — HTTP-сервер host на `127.0.0.1:8788` без ключа. Транспорт — `adapters/http` (без знания о RAG), хранилище
+сессий `app/ragSessions.ts` и обработчики `app/ragService.ts` вызывают публичный `chatTurn`; диалоги лежат в `Map` процесса
+и теряются при перезапуске. Наружу сервис открывает шлюз: маршруты `POST /v1/rag/chat` и `DELETE /v1/rag/sessions/{id}`
+проходят те же ключ и rate limit, но очередь у RAG отдельная.
+
+```mermaid
+flowchart LR
+    Client[Второй Mac, curl] -->|"HTTP, Bearer-ключ"| Gateway[llm-gateway :8787]
+    Gateway -->|"/v1/rag/*"| Serve[rag serve 127.0.0.1:8788]
+    Serve --> Ollama[Ollama: эмбеддинги и модель]
+    Serve --> Index[(.local/rag/index.json)]
+```
 
 ## Границы и рост
 

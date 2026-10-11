@@ -16,7 +16,8 @@ RAG-чат с памятью (ADR 0006): в режиме `/rag on` реплик�
 Локальная модель (ADR 0007): `llm.provider` переключает ответы, rewrite и память задачи между DeepSeek и локальным
 OpenAI-совместимым сервером; эмбеддинги всегда в Ollama. `rag citations` сравнивает провайдеров: показывает время этапов и ошибки модели, эксперимент feod-local-llm.
 Оптимизация локальной модели (ADR 0008): Modelfile `rag-local-opt` и шаблон ответа `rag.answerPrompt`, эксперимент feod-local-tuning.
-Локальная модель как приватный сервис (ADR 0009): шлюз `servers/llm-gateway` с Bearer-ключом, rate limit, очередью и лимитом контекста перед Ollama; `llm.localApiKey`, эксперимент feod-local-service. Диалог живёт только в памяти сессии REPL. Специализированного реранкинга нет. Задания выдаются по одному;
+Локальная модель как приватный сервис (ADR 0009): шлюз `servers/llm-gateway` с Bearer-ключом, rate limit, очередью и лимитом контекста перед Ollama; `llm.localApiKey`, эксперимент feod-local-service.
+RAG как приватный сервис (ADR 0010): `rag serve` за шлюзом, сессии диалога в памяти процесса. Диалог живёт только в памяти: сессии REPL или процесса `rag serve`. Специализированного реранкинга нет. Задания выдаются по одному;
 docs/course.md — ориентир недели, он не разрешает реализовывать будущие задания заранее.
 Перед заданием сформулируй учебную цель и минимальный результат; улучшения отдели явно.
 
@@ -26,8 +27,9 @@ docs/course.md — ориентир недели, он не разрешает �
 | apps/host/src/core | Agent, ModelPort, типизированные ошибки |
 | apps/host/src/adapters/llm | DeepSeek через OpenAI-совместимый SDK |
 | apps/host/src/adapters/cli | Ввод, dispatch, REPL, отображение ошибок |
+| apps/host/src/adapters/http | HTTP-транспорт `rag serve`: `listen`, JSON-тело, формат ошибок, лог запроса |
 | apps/host/src/app | Единственная композиция host, реестры, Markdown-инструкции |
-| servers/llm-gateway | Шлюз перед Ollama: ключ, rate limit, параллельность, лимит контекста, прокси `/v1/chat/completions`; `GATEWAY_*` читает только его `app/main.ts` |
+| servers/llm-gateway | Шлюз перед Ollama: ключ, rate limit, параллельность, лимит контекста, прокси `/v1/chat/completions` и `/v1/rag/*`; `GATEWAY_*` читает только его `app/main.ts` |
 | apps/host/src/features/rag | Индексация и RAG-запрос: корпус, чанкинг, эмбеддинги Ollama, индекс, сравнение, поиск, rewrite, отбор по порогу, ответ, цитаты и режим «не знаю», калибровка, контрольные вопросы, чат (`chat/`: диалог, память задачи, ход, сценарии) |
 | experiments | Отчёты сравнений и контрольные вопросы: измерения, ручные оценки, выводы (feod-chunking, feod-rag, feod-retrieval, feod-citations, feod-chat, feod-local-llm, feod-local-tuning, feod-local-service) |
 | docs/adr, docs/demos | Решения и короткие ручные демонстрации |
@@ -56,7 +58,7 @@ core не импортирует SDK, Node API, адаптеры, app или ф�
 - Цитата: строка `- [N] «текст»` в ответе; `[N]` — `rank` фрагмента в сообщении; засчитывается, если после нормализации это подстрока текста чанка.
 - «Не знаю»: ответ без источников и цитат; при пустом отборе формирует код без вызова модели, иначе — модель.
 - top-K: конечный лимит чанков, которые получает модель (`rag.topK`); стратегия чанкинга — `rag.chunkStrategy`.
-- Диалог (`Dialog`): неизменяемый снимок сессии REPL — память задачи и ходы (`DialogTurn`: вопрос, запрос поиска, фрагменты, ответ, память после хода).
+- Диалог (`Dialog`): неизменяемый снимок сессии REPL или сессии `rag serve` — память задачи и ходы (`DialogTurn`: вопрос, запрос поиска, фрагменты, ответ, память после хода).
 - Память задачи (`TaskState`): цель, уточнения, ограничения и термины; обновляется моделью до поиска, формат — Markdown-разделы.
 - Окно истории (`rag.historyTurns`): сколько последних ходов уходит модели парами user/assistant.
 - Провайдер модели (`llm.provider`): `deepseek` или `local`; не путать с моделью эмбеддингов (`rag.embeddingModel`, всегда Ollama).
@@ -106,7 +108,7 @@ dependency-cruiser проверяет границы, циклы и import type.
 ## Команды разработки
 Node 24; npm ci; npm run hooks:install; npm run dev; npm run dev -- help; npm run dev:local — профиль lab.local.yaml (локальная модель); npm run gateway — шлюз локальной модели.
 npm run corpus:feod; npm run dev -- rag index; npm run dev -- rag compare.
-npm run dev -- rag calibrate; npm run dev -- rag ask "вопрос"; npm run dev -- rag eval; npm run dev -- rag citations; npm run dev -- rag dialog; в REPL — /rag on, /rag off, /rag state, /rag reset.
+npm run dev -- rag calibrate; npm run dev -- rag ask "вопрос"; npm run dev -- rag eval; npm run dev -- rag citations; npm run dev -- rag dialog; npm run dev:local -- rag serve; в REPL — /rag on, /rag off, /rag state, /rag reset.
 npm run lint; npm run typecheck; npm test; npm run test:coverage; npm run build.
 npm run check; npm run check:deps; npm run check:structure; npm run docs:generate.
 

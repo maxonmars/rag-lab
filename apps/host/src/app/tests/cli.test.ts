@@ -102,7 +102,7 @@ describe("CLI и REPL", () => {
     expect(result.output.match(/── rag-lab ──/g)).toHaveLength(1);
     expect(result.output.match(/Модель: deepseek · deepseek-flash/g)).toHaveLength(1);
     expect(result.output).toContain(
-      "/ask · /help · /config show · /rag index · /rag compare · /rag calibrate · /rag ask · /rag on · /rag off · /rag eval · /rag citations · /rag dialog · /rag state · /rag reset · /exit",
+      "/ask · /help · /config show · /rag index · /rag compare · /rag calibrate · /rag ask · /rag on · /rag off · /rag eval · /rag citations · /rag dialog · /rag serve · /rag state · /rag reset · /exit",
     );
     expect(result.output.match(/rag-lab > /g)).toHaveLength(2);
   });

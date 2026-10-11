@@ -18,7 +18,7 @@ function main(): void {
   });
   server.listen(config.port, config.host, () => {
     console.log(
-      `llm-gateway: http://${config.host}:${config.port} → ${config.upstreamUrl}, модель ${config.model}; ` +
+      `llm-gateway: http://${config.host}:${config.port} → ${config.upstreamUrl}, модель ${config.model}, RAG → ${config.ragUrl}; ` +
         `ключей ${config.apiKeys.length}, ${config.rateLimitPerMinute} запросов/мин, ` +
         `параллельно ${config.maxConcurrent}, очередь ${config.maxQueue}, ` +
         `вход ${config.maxInputChars} символов, выход ${config.maxOutputTokens} токенов, ` +

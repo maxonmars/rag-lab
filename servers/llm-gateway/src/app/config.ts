@@ -5,6 +5,8 @@ export type GatewayConfig = Readonly<{
   upstreamUrl: string;
   model: string;
   upstreamTimeoutMs: number;
+  ragUrl: string;
+  ragTimeoutMs: number;
   rateLimitPerMinute: number;
   maxConcurrent: number;
   maxQueue: number;
@@ -58,13 +60,13 @@ function parseKeys(env: Env): string[] {
   return keys;
 }
 
-function parseUpstreamUrl(env: Env): string {
-  const value = raw(env, "GATEWAY_UPSTREAM_URL") ?? "http://127.0.0.1:11434/v1";
+function parseHttpUrl(env: Env, name: string, fallback: string): string {
+  const value = raw(env, name) ?? fallback;
   try {
     const url = new URL(value);
     if (url.protocol !== "http:" && url.protocol !== "https:") throw new Error("protocol");
   } catch {
-    throw new GatewayConfigError("GATEWAY_UPSTREAM_URL: ожидается адрес http:// или https://");
+    throw new GatewayConfigError(`${name}: ожидается адрес http:// или https://`);
   }
   return value.replace(/\/+$/, "");
 }
@@ -74,9 +76,11 @@ export function parseGatewayConfig(env: Env): GatewayConfig {
     apiKeys: parseKeys(env),
     host: raw(env, "GATEWAY_HOST") ?? "0.0.0.0",
     port: integer(env, "GATEWAY_PORT", 8787, 1, 65535),
-    upstreamUrl: parseUpstreamUrl(env),
+    upstreamUrl: parseHttpUrl(env, "GATEWAY_UPSTREAM_URL", "http://127.0.0.1:11434/v1"),
     model: raw(env, "GATEWAY_MODEL") ?? "rag-local-opt",
     upstreamTimeoutMs: integer(env, "GATEWAY_UPSTREAM_TIMEOUT_MS", 180000, 1),
+    ragUrl: parseHttpUrl(env, "GATEWAY_RAG_URL", "http://127.0.0.1:8788"),
+    ragTimeoutMs: integer(env, "GATEWAY_RAG_TIMEOUT_MS", 300000, 1),
     rateLimitPerMinute: integer(env, "GATEWAY_RATE_LIMIT_PER_MINUTE", 20, 1),
     maxConcurrent: integer(env, "GATEWAY_MAX_CONCURRENT", 1, 1),
     maxQueue: integer(env, "GATEWAY_MAX_QUEUE", 4, 0),

@@ -34,6 +34,7 @@ it("команды имеют уникальные имена и алиасы, �
     ragEval: async () => ({ lines: [], path: "" }),
     ragCitations: async () => ({ lines: [], path: "" }),
     ragDialog: async () => ({ lines: [], path: "" }),
+    ragServe: async () => {},
     view: {
       answer: () => {},
       help: () => {},
@@ -46,6 +47,7 @@ it("команды имеют уникальные имена и алиасы, �
       taskState: () => {},
       ragMode: () => {},
       evalSaved: () => {},
+      serving: () => {},
     },
   });
   const names = commands.flatMap((command) => [command.name, ...(command.aliases ?? [])]);

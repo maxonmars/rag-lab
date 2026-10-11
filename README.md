@@ -69,6 +69,7 @@ npm run dev
 команды — [docs/commands.md](docs/commands.md). Пример файла — [lab.config.example.yaml](lab.config.example.yaml).
 `npm run dev:local` запускает приложение с профилем [lab.local.yaml](lab.local.yaml) на локальной модели — [демо](docs/demos/local-llm.md).
 `npm run gateway` запускает [шлюз локальной модели](servers/llm-gateway/README.md) с ключом и лимитами для доступа по сети — [демо](docs/demos/local-service.md).
+`npm run dev:local -- rag serve` поднимает RAG-чат как HTTP-сервис за тем же шлюзом ([ADR 0010](docs/adr/0010-rag-service.md)) — [демо](docs/demos/rag-service.md).
 
 ## Материалы
 

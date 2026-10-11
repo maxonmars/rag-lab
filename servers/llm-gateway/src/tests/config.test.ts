@@ -13,6 +13,8 @@ describe("конфигурация шлюза", () => {
       upstreamUrl: "http://127.0.0.1:11434/v1",
       model: "rag-local-opt",
       upstreamTimeoutMs: 180000,
+      ragUrl: "http://127.0.0.1:8788",
+      ragTimeoutMs: 300000,
       rateLimitPerMinute: 20,
       maxConcurrent: 1,
       maxQueue: 4,
@@ -32,6 +34,15 @@ describe("конфигурация шлюза", () => {
     expect(config.upstreamUrl).toBe("http://localhost:11434/v1");
     expect(config.port).toBe(9000);
     expect(config.maxQueue).toBe(0);
+  });
+
+  it("читает адрес и таймаут RAG-сервиса и убирает хвостовой слэш", () => {
+    const config = parseGatewayConfig({
+      ...env,
+      GATEWAY_RAG_URL: "http://10.0.0.5:9000/",
+      GATEWAY_RAG_TIMEOUT_MS: "1000",
+    });
+    expect([config.ragUrl, config.ragTimeoutMs]).toEqual(["http://10.0.0.5:9000", 1000]);
   });
 
   it("без GATEWAY_API_KEYS называет переменную", () => {
@@ -61,6 +72,9 @@ describe("конфигурация шлюза", () => {
     ["GATEWAY_RATE_LIMIT_PER_MINUTE", "abc", /GATEWAY_RATE_LIMIT_PER_MINUTE/],
     ["GATEWAY_UPSTREAM_URL", "ftp://host", /GATEWAY_UPSTREAM_URL/],
     ["GATEWAY_UPSTREAM_URL", "не адрес", /GATEWAY_UPSTREAM_URL/],
+    ["GATEWAY_RAG_URL", "ftp://host", /GATEWAY_RAG_URL: ожидается адрес http/],
+    ["GATEWAY_RAG_URL", "не адрес", /GATEWAY_RAG_URL/],
+    ["GATEWAY_RAG_TIMEOUT_MS", "0", /GATEWAY_RAG_TIMEOUT_MS: ожидается целое не меньше 1/],
   ])("%s=%s отклоняется с названием переменной", (name, value, message) => {
     expect(() => parseGatewayConfig({ ...env, [name]: value })).toThrow(message);
   });
